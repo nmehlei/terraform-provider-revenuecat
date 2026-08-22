@@ -1,16 +1,16 @@
 ## 1. Mock API server
 
-- [ ] 1.1 Implement the in-memory store and object model for projects, apps, products, entitlements, offerings and packages with generated ids and timestamps; verify with unit tests for id uniqueness and create-then-read
-- [ ] 1.2 Implement request routing and the CRUD handlers with parent scoping, returning 404 for absent or wrongly-parented objects; verify with tests for a wrong project id and for listing packages scoped to one offering
-- [ ] 1.3 Implement bearer authentication returning 401 for a missing or non-bearer credential; verify with tests that state is unchanged after a rejected request
-- [ ] 1.4 Implement list pagination with a configurable page size and next_page cursors; verify with tests for a single page and for a multi-page walk that repeats no item
-- [ ] 1.5 Implement attach and detach actions plus attached-product listing, including re-attach updating eligibility criteria; verify with tests for attach, selective detach and criteria update
-- [ ] 1.6 Implement counted 429 fault injection with Retry-After, off by default; verify with a test that the first request fails and the second succeeds
+- [x] 1.1 Implement the in-memory store and object model for projects, apps, products, entitlements, offerings and packages with generated ids and timestamps; verify with unit tests for id uniqueness and create-then-read
+- [x] 1.2 Implement request routing and the CRUD handlers with parent scoping, returning 404 for absent or wrongly-parented objects; verify with tests for a wrong project id and for listing packages scoped to one offering
+- [x] 1.3 Implement bearer authentication returning 401 for a missing or non-bearer credential; verify with tests that state is unchanged after a rejected request
+- [x] 1.4 Implement list pagination with a configurable page size and next_page cursors; verify with tests for a single page and for a multi-page walk that repeats no item
+- [x] 1.5 Implement attach and detach actions plus attached-product listing, including re-attach updating eligibility criteria; verify with tests for attach, selective detach and criteria update
+- [x] 1.6 Implement counted 429 fault injection with Retry-After, off by default; verify with a test that the first request fails and the second succeeds
 - [ ] 1.7 Add cmd/mock-revenuecat with address, page size, seeded project and fault flags plus an unauthenticated health endpoint; verify the binary builds and serves a seeded project
 
 ## 2. Client conformance against the mock
 
-- [ ] 2.1 Add a test that drives the real API client through a full catalog lifecycle against the mock, asserting each object is created, read back, updated, listed and deleted; verify it passes with no network access
+- [x] 2.1 Add a test that drives the real API client through a full catalog lifecycle against the mock, asserting each object is created, read back, updated, listed and deleted; verify it passes with no network access
 
 ## 3. Terraform-driven end-to-end tests
 
