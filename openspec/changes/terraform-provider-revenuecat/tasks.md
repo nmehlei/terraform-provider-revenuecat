@@ -29,7 +29,7 @@
 - [x] 4.4 Implement `revenuecat_entitlement` with in-place update of `lookup_key` and `display_name`, CRUD and import; verify with unit tests for the schema and import parsing
 - [x] 4.5 Implement `revenuecat_offering` including `is_current` and the `metadata` map, CRUD and import; verify with unit tests for the schema and model conversion of metadata
 - [x] 4.6 Implement `revenuecat_package` with `RequiresReplace` on `project_id` and `offering_id`, CRUD and three-segment import; verify with unit tests for the schema and import parsing
-- [ ] 4.7 Ensure every resource's Read removes the resource from state on not-found and every Delete tolerates not-found; verify with a test per resource over a fake server returning 404
+- [x] 4.7 Ensure every resource's Read removes the resource from state on not-found and every Delete tolerates not-found; verify with a test per resource over a fake server returning 404
 
 ## 5. Catalog attachments (capability: catalog-attachments)
 
