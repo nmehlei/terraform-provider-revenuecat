@@ -1,19 +1,19 @@
 ## 1. Repository and module scaffolding
 
-- [ ] 1.1 Initialize the Go module `github.com/nmehlei/terraform-provider-revenuecat` for Go 1.24 and add the terraform-plugin-framework dependencies; verify `go mod download` and `go build ./...` succeed
+- [x] 1.1 Initialize the Go module `github.com/nmehlei/terraform-provider-revenuecat` for Go 1.24 and add the terraform-plugin-framework dependencies; verify `go mod download` and `go build ./...` succeed
 - [ ] 1.2 Add `main.go` serving the provider over `providerserver` with a `-debug` flag; verify `go vet ./...` passes and the binary builds
 - [ ] 1.3 Add `.gitignore`, `LICENSE` (MPL-2.0), `Makefile` with `build`/`test`/`testacc`/`fmt`/`lint` targets, and a GitHub Actions workflow running build, vet and tests; verify `make build` and `make test` run
 
 ## 2. API client (capability: api-client)
 
-- [ ] 2.1 Define the client struct, constructor and options (base URL, API key, HTTP client, max retries, timeout, user agent) and a `do()` request path that sets the Bearer, Accept, Content-Type and User-Agent headers; verify with a fake-server test asserting every header
-- [ ] 2.2 Implement base-URL joining that preserves the base path prefix; verify with a test using a base URL carrying a `/v2` prefix
-- [ ] 2.3 Implement `APIError` with status, code and message, JSON and non-JSON body decoding, and `IsNotFound`; verify with tests for a structured 400 body, a non-JSON 500 body, and a 404
-- [ ] 2.4 Implement retry with exponential backoff for 429/5xx/transport errors, `Retry-After` support, no retry on other 4xx, and context-aware backoff waits; verify with tests for retried 429, honored Retry-After, un-retried 422, exhausted 503, and cancellation during backoff
-- [ ] 2.5 Implement cursor pagination that concatenates pages until no next cursor and errors past a bounded page count; verify with tests for a two-page listing, a single-page listing, and a never-ending cursor
-- [ ] 2.6 Define the typed models for project, app, product, entitlement, offering and package with JSON tags; verify with a round-trip decode test per model
-- [ ] 2.7 Implement project read/list and app, product, entitlement, offering and package CRUD operations; verify with fake-server tests asserting the method, path and request body of each operation
-- [ ] 2.8 Implement entitlement and package attach/detach and attached-product listing operations; verify with fake-server tests asserting the action paths and payload shapes
+- [x] 2.1 Define the client struct, constructor and options (base URL, API key, HTTP client, max retries, timeout, user agent) and a `do()` request path that sets the Bearer, Accept, Content-Type and User-Agent headers; verify with a fake-server test asserting every header
+- [x] 2.2 Implement base-URL joining that preserves the base path prefix; verify with a test using a base URL carrying a `/v2` prefix
+- [x] 2.3 Implement `APIError` with status, code and message, JSON and non-JSON body decoding, and `IsNotFound`; verify with tests for a structured 400 body, a non-JSON 500 body, and a 404
+- [x] 2.4 Implement retry with exponential backoff for 429/5xx/transport errors, `Retry-After` support, no retry on other 4xx, and context-aware backoff waits; verify with tests for retried 429, honored Retry-After, un-retried 422, exhausted 503, and cancellation during backoff
+- [x] 2.5 Implement cursor pagination that concatenates pages until no next cursor and errors past a bounded page count; verify with tests for a two-page listing, a single-page listing, and a never-ending cursor
+- [x] 2.6 Define the typed models for project, app, product, entitlement, offering and package with JSON tags; verify with a round-trip decode test per model
+- [x] 2.7 Implement project read/list and app, product, entitlement, offering and package CRUD operations; verify with fake-server tests asserting the method, path and request body of each operation
+- [x] 2.8 Implement entitlement and package attach/detach and attached-product listing operations; verify with fake-server tests asserting the action paths and payload shapes
 
 ## 3. Provider configuration (capability: provider-configuration)
 
