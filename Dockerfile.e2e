@@ -1,0 +1,33 @@
+# The end-to-end runner: a terraform CLI with this provider installed through a
+# filesystem mirror, driving the repository's own example against the mock.
+#
+# This exercises the path a practitioner actually uses — a locally installed
+# plugin and the terraform CLI — rather than the plugin test harness.
+
+FROM golang:1.25-alpine AS build
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+ARG VERSION=0.1.0
+RUN CGO_ENABLED=0 go build -trimpath \
+      -ldflags "-X main.version=${VERSION}" \
+      -o /out/terraform-provider-revenuecat .
+
+FROM hashicorp/terraform:1.14
+
+ARG VERSION=0.1.0
+ENV PLUGIN_DIR=/plugins
+ENV WORK_DIR=/work
+
+# The mirror layout terraform expects for a filesystem_mirror source.
+COPY --from=build /out/terraform-provider-revenuecat \
+     /plugins/registry.terraform.io/nmehlei/revenuecat/${VERSION}/linux_amd64/terraform-provider-revenuecat_v${VERSION}
+
+WORKDIR /work
+COPY examples /work/examples
+COPY test/e2e/run.sh /usr/local/bin/run-e2e.sh
+
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/run-e2e.sh"]

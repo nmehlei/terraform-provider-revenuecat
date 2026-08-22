@@ -1,0 +1,48 @@
+# End-to-end verification of the provider against a stateful mock of the
+# RevenueCat API, with no RevenueCat account and no network access required.
+#
+#   docker compose up --build --abort-on-container-exit --exit-code-from e2e
+#
+# The e2e service applies examples/complete, asserts that re-planning proposes
+# nothing, and destroys everything. Its exit code is the result.
+
+services:
+  mock:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - "-addr"
+      - ":8080"
+      - "-api-key"
+      - "sk-mock"
+      - "-seed-project-id"
+      - "proj_mock"
+      - "-seed-project-name"
+      - "Acme"
+    expose:
+      - "8080"
+    healthcheck:
+      # The health endpoint is deliberately unauthenticated so this probe needs
+      # no credential.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
+
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    depends_on:
+      mock:
+        condition: service_healthy
+    environment:
+      MOCK_URL: "http://mock:8080/v2"
+      MOCK_API_KEY: "sk-mock"
+      PROJECT_NAME: "Acme"
+      # Terraform must not try to reach the registry: the provider comes from
+      # the filesystem mirror baked into the image.
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"

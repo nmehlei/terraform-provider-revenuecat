@@ -98,10 +98,16 @@ func TestProviderIndexDocumentsEveryArgument(t *testing.T) {
 		}
 	}
 
-	// The unverified-contract caveat is the single most important thing on the
-	// page; losing it in an edit would mislead every reader.
-	if !strings.Contains(content, "not been verified against a live RevenueCat account") {
-		t.Error("docs/index.md no longer states that the API contract is unverified")
+	// The caveat is the single most important thing on the page, and it has to
+	// stay accurate in both directions: it must say what is verified and what
+	// is not, so a reader neither over-trusts nor under-trusts the provider.
+	for _, claim := range []string{
+		"verified against a mock of the RevenueCat API, not against the live service",
+		"self-consistent under Terraform",
+	} {
+		if !strings.Contains(content, claim) {
+			t.Errorf("docs/index.md no longer states %q; the status caveat must stay accurate", claim)
+		}
 	}
 }
 

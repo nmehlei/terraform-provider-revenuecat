@@ -1,7 +1,7 @@
 BINARY  := terraform-provider-revenuecat
 VERSION ?= dev
 
-.PHONY: default build install test testacc fmt fmtcheck vet lint tidy clean
+.PHONY: default build install test testacc testacc-mock mock compose-e2e fmt fmtcheck vet lint tidy clean
 
 default: build
 
@@ -17,12 +17,27 @@ install:
 test:
 	go test ./... -timeout 120s
 
-## testacc: run acceptance tests against a real RevenueCat project.
-## Requires a Terraform binary, REVENUECAT_API_KEY and REVENUECAT_PROJECT_ID.
-## These create and destroy real catalog objects — never point them at a
-## production project.
+## testacc-mock: run the Terraform-driven end-to-end tests against the in-process
+## mock API. Needs a terraform binary on PATH but no credentials and no network.
+## This is the verification most worth running before opening a pull request.
+testacc-mock:
+	TF_ACC=1 go test ./internal/provider/ -run TestE2E -v -timeout 30m
+
+## testacc: run every acceptance test, including those against a real RevenueCat
+## project. Those skip unless REVENUECAT_API_KEY and REVENUECAT_PROJECT_ID are
+## set; when set, they create and destroy real catalog objects — never point
+## them at a production project.
 testacc:
 	TF_ACC=1 go test ./... -v -timeout 30m
+
+## mock: run the mock RevenueCat API server locally on :8080
+mock:
+	go run ./cmd/mock-revenuecat -addr :8080 -api-key sk-mock -seed-project-id proj_mock
+
+## compose-e2e: apply the complete example against the mock in containers
+compose-e2e:
+	docker compose up --build --abort-on-container-exit --exit-code-from e2e
+	docker compose down -v
 
 ## fmt: format Go sources
 fmt:

@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build and test
+  unit:
+    name: Build and unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,3 +37,51 @@ jobs:
         run: |
           go mod tidy
           git diff --exit-code -- go.mod go.sum
+
+  terraform-e2e:
+    name: End-to-end against the mock API
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest supported line and the current one, so a change that only
+        # works on one of them is caught here rather than by a practitioner.
+        terraform: ["1.9.*", "1.14.*"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ matrix.terraform }}
+          terraform_wrapper: false
+
+      - name: Run the Terraform-driven end-to-end tests
+        env:
+          TF_ACC: "1"
+        run: go test ./internal/provider/ -run TestE2E -v -timeout 30m
+
+  compose-e2e:
+    name: End-to-end in containers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply the complete example against the mock in containers
+        run: |
+          docker compose up \
+            --build \
+            --abort-on-container-exit \
+            --exit-code-from e2e
+
+      - name: Show the mock server log on failure
+        if: failure()
+        run: docker compose logs mock
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

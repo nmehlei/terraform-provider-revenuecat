@@ -10,8 +10,9 @@ description: |-
 The RevenueCat provider manages a RevenueCat project's catalog — apps, products, entitlements,
 offerings and packages — through the [RevenueCat REST API v2](https://www.revenuecat.com/docs/api-v2).
 
-~> **The API contract in this provider has not been verified against a live RevenueCat account.**
-See [Status](#status) below before using it against a production project.
+~> **This provider is verified against a mock of the RevenueCat API, not against the live service.**
+Its behavior under Terraform is tested end to end on every commit; its encoding of RevenueCat's
+wire format is not. See [Status](#status) below before using it against a production project.
 
 ## Example Usage
 
@@ -83,11 +84,26 @@ exponential backoff up to `max_retries`. A `Retry-After` header is honored when 
 
 ## Status
 
-This provider is pre-1.0. Its encoding of the RevenueCat API v2 contract — endpoint paths and
-request and response field names — was written from API documentation and has **not** been
-exercised against a live RevenueCat account. Resource schemas may change as the contract is
-corrected against reality.
+This provider is pre-1.0. What that means concretely:
 
-Every wire-format detail lives in a single package (`internal/revenuecat`), so a correction is
-localized. If you hit a request the API rejects, please open an issue with the failing request and
-response.
+**What is verified on every commit.** A real `terraform` binary drives every resource through a
+full lifecycle — apply, refresh, update, replace, import and destroy — against a stateful mock of
+the API v2 catalog. Terraform itself enforces that the plan matches what apply returned, that a
+refresh introduces no drift, and that imported state matches applied state. The repository's own
+complete example is applied the same way, so it cannot rot. These tests need no credentials and no
+network.
+
+**What is not verified.** The mock encodes the same assumed API contract as the provider's client:
+the endpoint paths and request and response field names were written from API documentation rather
+than observed against the live service. Agreement between them proves the provider is
+self-consistent under Terraform; it does not prove the contract matches RevenueCat.
+
+So the failure mode to expect is not a broken plan or a corrupt state file — those are covered — but
+a request the real API rejects or answers in a different shape. Whoever first runs this against a
+real API key is performing the verification the test suite cannot.
+
+Every wire-format detail lives in a single package (`internal/revenuecat`), and the mock mirrors it
+in one more, so a correction is localized to two files. If you hit a request the API rejects, please
+open an issue with the failing request and response.
+
+Resource schemas may change as the contract is corrected.

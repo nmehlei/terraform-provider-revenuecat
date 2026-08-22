@@ -4,10 +4,11 @@ A Terraform provider that manages a [RevenueCat](https://www.revenuecat.com/) pr
 apps, products, entitlements, offerings and packages — through the RevenueCat REST API v2.
 
 > [!IMPORTANT]
-> **The API contract in this provider has not been verified against a live RevenueCat account.**
-> Endpoint paths and request and response field names were written from API documentation, not
-> exercised against the real service. Every test runs against an in-process fake. Read
-> [Status](#status) before pointing this at a production project.
+> **This provider is verified against a mock of the RevenueCat API, not against the live service.**
+> A real `terraform` binary drives every resource through a full lifecycle on every commit, so its
+> behavior under Terraform is tested. Its encoding of RevenueCat's wire format is not: endpoint
+> paths and field names were written from API documentation rather than observed against the real
+> service. Read [Status](#status) before pointing this at a production project.
 
 ## Why
 
@@ -162,12 +163,41 @@ make testacc    # acceptance tests against a real project (see below)
 
 ### Tests
 
-Unit tests run against `httptest` fakes and never reach the network. They cover the client's
-authentication, pagination, retry and error handling; the attachment set-difference logic; import
-ID parsing; credential resolution; and every resource's not-found handling.
+Verification comes in four layers, each catching something the one below it cannot.
 
-Acceptance tests drive a real `terraform` binary against a real RevenueCat project. They are gated
-behind `TF_ACC` and skipped by default:
+| Layer | Command | Needs | Catches |
+| --- | --- | --- | --- |
+| Unit | `make test` | nothing | client request shapes, retry, pagination, error decoding, schema rules, set diffs |
+| Client conformance | `make test` | nothing | operations that do not compose — what Create wrote, Read does not return |
+| Terraform end-to-end | `make testacc-mock` | a `terraform` binary | inconsistent results after apply, plans that never converge, broken imports |
+| Containers | `make compose-e2e` | Docker | the real CLI install path, using the shipped example |
+
+The Terraform layer is the one worth running before opening a pull request:
+
+```shell
+make testacc-mock
+```
+
+It starts an in-process mock of the RevenueCat API and drives every resource through apply,
+refresh, update, replacement, import and destroy with a real `terraform` binary. No credentials, no
+network, no RevenueCat account. Without a `terraform` binary it skips with a message saying so, and
+`go test ./...` stays runnable.
+
+To run the mock on its own — useful for poking at the provider by hand:
+
+```shell
+make mock   # serves on :8080, API key sk-mock, project proj_mock
+```
+
+Then point the provider at it:
+
+```shell
+export REVENUECAT_API_KEY=sk-mock
+export REVENUECAT_BASE_URL=http://localhost:8080/v2
+```
+
+Acceptance tests against a **real** RevenueCat project are separate and opt-in. They skip unless
+credentials are present:
 
 ```shell
 export TF_ACC=1
@@ -181,15 +211,40 @@ one.**
 
 ## Status
 
-This provider is pre-1.0 and its API contract is unverified. It was built in an environment with no
-network access to RevenueCat, so the endpoint paths and payload field names come from API
-documentation rather than from observing the live service. The unit tests prove the provider is
-internally consistent; they cannot prove it matches the real API.
+This provider is pre-1.0. It is worth being precise about what that does and does not mean here.
 
-Whoever first runs it against a real API key is performing the verification the test suite could
-not. If a request is rejected, the fix is likely a one-line change: every wire-format detail lives
-in [`internal/revenuecat`](internal/revenuecat), deliberately isolated so a correction stays local.
-Please open an issue with the failing request and response.
+### What is verified on every commit
+
+- **Behavior under Terraform.** A real `terraform` binary drives every resource through apply,
+  refresh, update, replacement, import and destroy against a stateful mock of the API v2 catalog.
+  Terraform itself enforces that the plan matches what apply returned, that a refresh introduces no
+  drift, and that imported state matches applied state — the provider bugs that a unit test calling
+  the client directly simply cannot see.
+- **That an applied configuration settles.** Every end-to-end case re-plans after applying and
+  requires an empty plan, which is what catches a Read that normalizes a value differently from
+  Create and would otherwise show practitioners a diff that never converges.
+- **That the documented example works.** `examples/complete` is applied unmodified, so the
+  documentation cannot drift into being unusable.
+- **The container path.** A Compose stack installs the provider through a filesystem mirror and
+  drives it with the terraform CLI, the way a practitioner would.
+
+None of this needs credentials, a RevenueCat account, or network access.
+
+### What is not verified
+
+The mock encodes the *same assumed API contract* as the provider's client. Both were written from
+API documentation rather than observed against the live service, so agreement between them
+demonstrates that the provider is self-consistent under Terraform — not that the contract matches
+RevenueCat.
+
+The failure mode to expect, then, is not a broken plan or a corrupt state file. It is a request the
+real API rejects or answers in a different shape. Whoever first runs this against a real API key is
+performing the verification the test suite cannot.
+
+Every wire-format detail lives in `internal/revenuecat`, and `internal/mockrevenuecat` mirrors it,
+so a correction is localized to those two packages — and the end-to-end tests fail loudly if they
+drift apart. If you hit a request the API rejects, please open an issue with the failing request and
+response.
 
 Resource schemas may change as the contract is corrected.
 
