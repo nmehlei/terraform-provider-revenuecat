@@ -1,0 +1,24 @@
+# Build output
+/terraform-provider-revenuecat
+/dist/
+*.exe
+
+# Go
+vendor/
+*.test
+*.out
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!examples/**/*.tfvars.example
+crash.log
+
+# Editors
+.idea/
+.vscode/
+*.swp
+.DS_Store

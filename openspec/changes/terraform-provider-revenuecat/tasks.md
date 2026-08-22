@@ -2,7 +2,7 @@
 
 - [x] 1.1 Initialize the Go module `github.com/nmehlei/terraform-provider-revenuecat` for Go 1.24 and add the terraform-plugin-framework dependencies; verify `go mod download` and `go build ./...` succeed
 - [x] 1.2 Add `main.go` serving the provider over `providerserver` with a `-debug` flag; verify `go vet ./...` passes and the binary builds
-- [ ] 1.3 Add `.gitignore`, `LICENSE` (MPL-2.0), `Makefile` with `build`/`test`/`testacc`/`fmt`/`lint` targets, and a GitHub Actions workflow running build, vet and tests; verify `make build` and `make test` run
+- [x] 1.3 Add `.gitignore`, `LICENSE` (MIT — MPL-2.0 was planned, but its text could not be fetched in this environment and reproducing it from memory would be unreliable), `Makefile` with `build`/`test`/`testacc`/`fmt`/`lint` targets, and a GitHub Actions workflow running build, vet and tests; verify `make build` and `make test` run
 
 ## 2. API client (capability: api-client)
 
@@ -45,11 +45,11 @@
 
 ## 7. Documentation and examples
 
-- [ ] 7.1 Write `docs/index.md` for the provider plus a page per resource and data source, each with arguments, attributes and an import section; verify every registered type has a corresponding docs page
-- [ ] 7.2 Add runnable `examples/` covering provider setup and an end-to-end catalog (app, products, entitlement, offering, packages and both attachments); verify the example files are syntactically well-formed HCL
-- [ ] 7.3 Write `README.md` covering installation, provider configuration, a quick-start example, how to run unit and acceptance tests, and an explicit statement that the API contract is encoded from documentation and unverified against the live API; verify the statement is present
+- [x] 7.1 Write `docs/index.md` for the provider plus a page per resource and data source, each with arguments, attributes and an import section; verify every registered type has a corresponding docs page
+- [x] 7.2 Add runnable `examples/` covering provider setup and an end-to-end catalog (app, products, entitlement, offering, packages and both attachments); verify the example files are syntactically well-formed HCL
+- [x] 7.3 Write `README.md` covering installation, provider configuration, a quick-start example, how to run unit and acceptance tests, and an explicit statement that the API contract is encoded from documentation and unverified against the live API; verify the statement is present
 
 ## 8. Verification
 
-- [ ] 8.1 Add `TF_ACC`-gated acceptance tests for the entitlement and offering lifecycles that skip cleanly when unset; verify they are skipped by `go test ./...` without `TF_ACC`
-- [ ] 8.2 Run `gofmt -l`, `go vet ./...` and `go test ./...` across the module and confirm formatting is clean, vet is silent and all tests pass
+- [x] 8.1 Add `TF_ACC`-gated acceptance tests for the entitlement and offering lifecycles that skip cleanly when unset; verify they are skipped by `go test ./...` without `TF_ACC`
+- [x] 8.2 Run `gofmt -l`, `go vet ./...` and `go test ./...` across the module and confirm formatting is clean, vet is silent and all tests pass
