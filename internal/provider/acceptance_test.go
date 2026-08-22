@@ -33,8 +33,27 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 	"revenuecat": providerserver.NewProtocol6WithError(New("test")()),
 }
 
-// testAccPreCheck fails fast with a clear message when the environment is not
-// set up, rather than letting the test fail deep inside an apply.
+// requireRealService skips unless credentials for a real RevenueCat project are
+// present. TF_ACC alone is not enough, because the mock-driven end-to-end tests
+// in the e2e_* files also run under TF_ACC and need no credentials — failing
+// here would make those unrunnable.
+func requireRealService(t *testing.T) {
+	t.Helper()
+
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("set TF_ACC=1 to run acceptance tests")
+	}
+
+	for _, name := range []string{envAPIKey, envProjectID} {
+		if os.Getenv(name) == "" {
+			t.Skipf("%s is not set; skipping the tests that need a real RevenueCat project. "+
+				"Run `make testacc-mock` for the credential-free end-to-end tests.", name)
+		}
+	}
+}
+
+// testAccPreCheck runs immediately before the first step, once the test has
+// already decided to run.
 func testAccPreCheck(t *testing.T) {
 	t.Helper()
 
@@ -51,9 +70,7 @@ func testAccProjectID(t *testing.T) string {
 }
 
 func TestAccEntitlement_lifecycle(t *testing.T) {
-	if os.Getenv("TF_ACC") == "" {
-		t.Skip("set TF_ACC=1 to run acceptance tests against a real RevenueCat project")
-	}
+	requireRealService(t)
 
 	projectID := testAccProjectID(t)
 	lookupKey := "tfacc-entitlement"
@@ -89,9 +106,7 @@ func TestAccEntitlement_lifecycle(t *testing.T) {
 }
 
 func TestAccOffering_lifecycle(t *testing.T) {
-	if os.Getenv("TF_ACC") == "" {
-		t.Skip("set TF_ACC=1 to run acceptance tests against a real RevenueCat project")
-	}
+	requireRealService(t)
 
 	projectID := testAccProjectID(t)
 	lookupKey := "tfacc-offering"

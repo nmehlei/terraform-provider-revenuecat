@@ -14,12 +14,12 @@
 
 ## 3. Terraform-driven end-to-end tests
 
-- [ ] 3.1 Add the end-to-end harness: locate the terraform binary, skip with an actionable message when absent or when TF_ACC is unset, and start a mock server per test with the provider pointed at it; verify the suite skips cleanly with TF_ACC unset
-- [ ] 3.2 Add lifecycle tests for entitlement and offering covering apply, empty follow-up plan, in-place update and import verification; verify all steps pass against the mock
-- [ ] 3.3 Add lifecycle tests for app, product and package including the three-segment package import; verify all steps pass
-- [ ] 3.4 Add a test asserting an identity-attribute change replaces the resource and changes its id; verify it passes
-- [ ] 3.5 Add attachment tests covering apply, changing the product set with an empty follow-up plan, and destroying the attachment while its products and parent survive; verify by reading the mock after destroy
-- [ ] 3.6 Add a test applying the repository's examples/complete configuration against the mock and asserting an empty second plan and a clean destroy; verify it passes
+- [x] 3.1 Add the end-to-end harness: locate the terraform binary, skip with an actionable message when absent or when TF_ACC is unset, and start a mock server per test with the provider pointed at it; verify the suite skips cleanly with TF_ACC unset
+- [x] 3.2 Add lifecycle tests for entitlement and offering covering apply, empty follow-up plan, in-place update and import verification; verify all steps pass against the mock
+- [x] 3.3 Add lifecycle tests for app, product and package including the three-segment package import; verify all steps pass
+- [x] 3.4 Add a test asserting an identity-attribute change replaces the resource and changes its id; verify it passes
+- [x] 3.5 Add attachment tests covering apply, changing the product set with an empty follow-up plan, and destroying the attachment while its products and parent survive; verify by reading the mock after destroy
+- [x] 3.6 Add a test applying the repository's examples/complete configuration against the mock and asserting an empty second plan and a clean destroy; verify it passes
 
 ## 4. Docker Compose end-to-end
 
