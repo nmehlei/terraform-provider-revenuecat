@@ -1,0 +1,10 @@
+# GitVersion 5.x configuration. The 5.x schema uses `tag` and `is-mainline`; the 6.x names
+# (`label`, `is-main-branch`) fail deserialization against 5.x with
+# "Property 'label' not found on type BranchConfig".
+mode: Mainline
+branches:
+  main:
+    regex: ^main$
+    tag: ''
+    increment: Patch
+    is-mainline: true
