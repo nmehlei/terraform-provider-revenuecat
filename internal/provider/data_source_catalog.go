@@ -66,6 +66,10 @@ func (d *appDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 				MarkdownDescription: "Store the app belongs to.",
 				Computed:            true,
 			},
+			"package_name": schema.StringAttribute{
+				MarkdownDescription: "Play Store package identifier, when `type` is `play_store`.",
+				Computed:            true,
+			},
 			"created_at": schema.Int64Attribute{
 				MarkdownDescription: "Creation time of the app, in milliseconds since the Unix epoch.",
 				Computed:            true,

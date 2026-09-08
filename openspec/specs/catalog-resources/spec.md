@@ -26,13 +26,17 @@ its recreation, rather than returning an error.
 
 ### Requirement: App resource manages a store app
 The `revenuecat_app` resource SHALL manage an app within a project. It SHALL require `project_id`,
-`name` and `type`, where `type` is one of the store types RevenueCat supports. It SHALL expose the
-computed attributes `id` and `created_at`. Changing `project_id` or `type` SHALL force replacement;
-changing `name` SHALL update in place.
+`name`, `type` and `package_name`, where `type` is one of the store types this provider implements
+(`play_store` only today — the API nests type-specific configuration under a key named after the
+type, and every other store type RevenueCat itself supports needs its own such config object added
+before this resource can create it). It SHALL expose the computed attributes `id` and `created_at`.
+Changing `project_id`, `type` or `package_name` SHALL force replacement; changing `name` SHALL
+update in place.
 
 #### Scenario: App created
-- **WHEN** an app is created with a project ID, name and type
-- **THEN** the provider issues a create call to the project's apps endpoint
+- **WHEN** an app is created with a project ID, name, type and package name
+- **THEN** the provider issues a create call to the project's apps endpoint, with the package name
+  nested under the `play_store` key the API requires alongside `type`
 - **AND** state records the returned app ID and creation timestamp
 
 #### Scenario: App renamed
@@ -88,7 +92,8 @@ Changing `project_id` SHALL force replacement; other attribute changes SHALL upd
 
 #### Scenario: Offering created as current
 - **WHEN** an offering is created with `is_current` set to true
-- **THEN** the create request carries that flag and state reflects it
+- **THEN** the provider creates the offering, then issues a follow-up update call setting the
+  flag — the API rejects `is_current` on the create request itself — and state reflects it
 
 #### Scenario: Offering metadata updated
 - **WHEN** `metadata` changes

@@ -48,15 +48,28 @@ func TestCatalogOperationWireContract(t *testing.T) {
 		wantBody   map[string]any
 	}{
 		{
+			// The API is a discriminated union: "type" alone 400s without the
+			// matching nested object (play_store here — the only type this
+			// provider implements, see ImplementedAppTypes).
 			name:     "create app",
 			response: App{ID: "app1"},
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.CreateApp(ctx, "proj1", CreateAppRequest{Name: "iOS", Type: AppTypeAppStore})
+				_, err := c.CreateApp(ctx, "proj1", CreateAppRequest{
+					Name:      "Android",
+					Type:      AppTypePlayStore,
+					PlayStore: &PlayStoreConfig{PackageName: "com.example.app"},
+				})
 				return err
 			},
 			wantMethod: "POST",
 			wantPath:   "/v2/projects/proj1/apps",
-			wantBody:   map[string]any{"name": "iOS", "type": "app_store"},
+			wantBody: map[string]any{
+				"name": "Android",
+				"type": "play_store",
+				"play_store": map[string]any{
+					"package_name": "com.example.app",
+				},
+			},
 		},
 		{
 			name:     "get app",
@@ -139,12 +152,14 @@ func TestCatalogOperationWireContract(t *testing.T) {
 			wantBody:   map[string]any{"display_name": "Pro Plus"},
 		},
 		{
+			// is_current is deliberately absent: the API rejects it on create
+			// ("Additional properties are not allowed") — see UpdateOfferingRequest
+			// for how a resource actually marks an offering current.
 			name:     "create offering",
 			response: Offering{ID: "ofrng1"},
 			call: func(ctx context.Context, c *Client) error {
 				_, err := c.CreateOffering(ctx, "proj1", CreateOfferingRequest{
 					LookupKey: "default",
-					IsCurrent: boolPtr(true),
 					Metadata:  map[string]string{"tier": "a"},
 				})
 				return err
@@ -153,9 +168,19 @@ func TestCatalogOperationWireContract(t *testing.T) {
 			wantPath:   "/v2/projects/proj1/offerings",
 			wantBody: map[string]any{
 				"lookup_key": "default",
-				"is_current": true,
 				"metadata":   map[string]any{"tier": "a"},
 			},
+		},
+		{
+			name:     "mark offering current",
+			response: Offering{ID: "ofrng1", IsCurrent: true},
+			call: func(ctx context.Context, c *Client) error {
+				_, err := c.UpdateOffering(ctx, "proj1", "ofrng1", UpdateOfferingRequest{IsCurrent: boolPtr(true)})
+				return err
+			},
+			wantMethod: "POST",
+			wantPath:   "/v2/projects/proj1/offerings/ofrng1",
+			wantBody:   map[string]any{"is_current": true},
 		},
 		{
 			name:     "create package under offering",

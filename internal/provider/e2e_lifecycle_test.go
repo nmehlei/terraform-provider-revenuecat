@@ -144,44 +144,47 @@ func TestE2EAppLifecycleAndReplacement(t *testing.T) {
 	requireTerraform(t)
 	env := newE2EEnv(t)
 
-	config := func(name, appType string) string {
+	config := func(name, packageName string) string {
 		return fmt.Sprintf(`
 resource "revenuecat_app" "test" {
-  project_id = %q
-  name       = %q
-  type       = %q
+  project_id   = %q
+  name         = %q
+  type         = "play_store"
+  package_name = %q
 }
-`, env.projectID, name, appType)
+`, env.projectID, name, packageName)
 	}
 
 	var firstID, afterRenameID string
 
 	env.steps(t,
 		resource.TestStep{
-			Config:           config("Acme iOS", "app_store"),
+			Config:           config("Acme Android", "com.acme.app"),
 			ConfigPlanChecks: expectEmptyPlan(),
 			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestCheckResourceAttr("revenuecat_app.test", "type", "app_store"),
+				resource.TestCheckResourceAttr("revenuecat_app.test", "type", "play_store"),
+				resource.TestCheckResourceAttr("revenuecat_app.test", "package_name", "com.acme.app"),
 				captureAttr(t, "revenuecat_app.test", "id", &firstID),
 			),
 		},
 		// Renaming updates in place: the identifier survives.
 		resource.TestStep{
-			Config:           config("Acme iOS Renamed", "app_store"),
+			Config:           config("Acme Android Renamed", "com.acme.app"),
 			ConfigPlanChecks: expectEmptyPlan(),
 			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestCheckResourceAttr("revenuecat_app.test", "name", "Acme iOS Renamed"),
+				resource.TestCheckResourceAttr("revenuecat_app.test", "name", "Acme Android Renamed"),
 				checkAttrUnchanged(t, "revenuecat_app.test", "id", &firstID),
 				captureAttr(t, "revenuecat_app.test", "id", &afterRenameID),
 			),
 		},
-		// Changing the store is an identity change: Terraform must replace it,
-		// which we detect by the identifier changing.
+		// The package name is part of the app's identity, same as the store
+		// type: Terraform must replace it, which we detect by the identifier
+		// changing.
 		resource.TestStep{
-			Config:           config("Acme Android", "play_store"),
+			Config:           config("Acme Android Renamed", "com.acme.app2"),
 			ConfigPlanChecks: expectEmptyPlan(),
 			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestCheckResourceAttr("revenuecat_app.test", "type", "play_store"),
+				resource.TestCheckResourceAttr("revenuecat_app.test", "package_name", "com.acme.app2"),
 				checkAttrChanged(t, "revenuecat_app.test", "id", &afterRenameID),
 			),
 		},
@@ -203,9 +206,10 @@ func TestE2EProductLifecycle(t *testing.T) {
 	config := func(storeIdentifier string) string {
 		return fmt.Sprintf(`
 resource "revenuecat_app" "ios" {
-  project_id = %[1]q
-  name       = "Acme iOS"
-  type       = "app_store"
+  project_id   = %[1]q
+  name         = "Acme Android"
+  type         = "play_store"
+  package_name = "com.acme.app"
 }
 
 resource "revenuecat_product" "test" {

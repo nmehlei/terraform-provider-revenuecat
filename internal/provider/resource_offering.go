@@ -113,12 +113,27 @@ func (r *offeringResource) Create(ctx context.Context, req resource.CreateReques
 	offering, err := r.client.CreateOffering(ctx, plan.ProjectID.ValueString(), revenuecat.CreateOfferingRequest{
 		LookupKey:   plan.LookupKey.ValueString(),
 		DisplayName: optionalString(plan.DisplayName),
-		IsCurrent:   optionalBool(plan.IsCurrent),
 		Metadata:    metadata,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create the RevenueCat offering", err.Error())
 		return
+	}
+
+	// The API rejects is_current on create ("Additional properties are not
+	// allowed") — every offering starts non-current, and marking one current
+	// is only accepted as a separate update call. Only make that call when
+	// the config actually asked for it; a plain create leaves it false, which
+	// matches what the API just gave us back anyway.
+	if plan.IsCurrent.ValueBool() {
+		isCurrent := true
+		offering, err = r.client.UpdateOffering(ctx, plan.ProjectID.ValueString(), offering.ID, revenuecat.UpdateOfferingRequest{
+			IsCurrent: &isCurrent,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Unable to mark the RevenueCat offering as current", err.Error())
+			return
+		}
 	}
 
 	state := offeringToModel(ctx, plan.ProjectID.ValueString(), offering, plan.Metadata, &resp.Diagnostics)

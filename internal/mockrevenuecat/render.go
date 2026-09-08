@@ -58,7 +58,7 @@ func renderGeneric(obj *object) map[string]any {
 }
 
 func appFields(body map[string]any) map[string]any {
-	return copyFields(body, "name", "type")
+	return copyFields(body, "name", "type", "play_store")
 }
 
 // appUpdateFields is narrower than appFields: an app's type is part of its
@@ -68,10 +68,26 @@ func appUpdateFields(body map[string]any) map[string]any {
 }
 
 func renderApp(obj *object) map[string]any {
-	return withFields(base(obj, "app"), obj, map[string]any{
+	rendered := withFields(base(obj, "app"), obj, map[string]any{
 		"name": "",
 		"type": "",
 	})
+	if playStore, ok := obj.Fields["play_store"]; ok {
+		rendered["play_store"] = playStore
+	}
+	return rendered
+}
+
+// validateAppCreate mirrors the real API's discriminated union: "type" alone
+// is not enough, the type-specific object must be present too (this provider
+// only implements "play_store" so far — see revenuecat.ImplementedAppTypes).
+func validateAppCreate(body map[string]any) *validationError {
+	if appType, _ := body["type"].(string); appType == "play_store" {
+		if _, ok := body["play_store"]; !ok {
+			return &validationError{code: "parameter_error", message: "'play_store' is a required property"}
+		}
+	}
+	return nil
 }
 
 func productFields(body map[string]any) map[string]any {
@@ -96,6 +112,16 @@ func renderEntitlement(obj *object) map[string]any {
 		"lookup_key":   "",
 		"display_name": "",
 	})
+}
+
+// validateOfferingCreate mirrors the real API rejecting "is_current" on
+// create ("Additional properties are not allowed") — an offering can only be
+// marked current through a later update, never at creation.
+func validateOfferingCreate(body map[string]any) *validationError {
+	if _, ok := body["is_current"]; ok {
+		return &validationError{code: "parameter_error", message: "Additional properties are not allowed ('is_current' was unexpected)"}
+	}
+	return nil
 }
 
 func offeringFields(body map[string]any) map[string]any {

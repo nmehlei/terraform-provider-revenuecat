@@ -52,12 +52,13 @@ func (s *Server) routeProjects(w http.ResponseWriter, r *http.Request, segments 
 	switch collection {
 	case "apps":
 		s.routeCollection(w, r, collectionSpec{
-			kind:      "app",
-			projectID: projectID,
-			basePath:  "/v2/projects/" + projectID + "/apps",
-			render:    renderApp,
-			create:    appFields,
-			update:    appUpdateFields,
+			kind:           "app",
+			projectID:      projectID,
+			basePath:       "/v2/projects/" + projectID + "/apps",
+			render:         renderApp,
+			create:         appFields,
+			update:         appUpdateFields,
+			validateCreate: validateAppCreate,
 		}, rest)
 
 	case "products":
@@ -100,8 +101,23 @@ type collectionSpec struct {
 	// means the collection does not support updates.
 	update func(body map[string]any) map[string]any
 
+	// validateCreate rejects a create body the real API would 400 on, before
+	// create ever runs. copyFields-based create funcs silently drop anything
+	// they don't recognize, so without this a body missing a required nested
+	// object (app) or carrying one the API disallows (offering's is_current
+	// on create) would succeed here and only fail against the real service —
+	// which is exactly how both of those bugs shipped once already.
+	validateCreate func(body map[string]any) *validationError
+
 	// match optionally narrows which stored objects belong to this collection.
 	match func(*object) bool
+}
+
+// validationError is a 400 the mock returns instead of running create, for a
+// request body shape the real API rejects.
+type validationError struct {
+	code    string
+	message string
 }
 
 func (s *Server) routeCollection(w http.ResponseWriter, r *http.Request, spec collectionSpec, segments []string) {
@@ -115,6 +131,12 @@ func (s *Server) routeCollection(w http.ResponseWriter, r *http.Request, spec co
 			if err != nil {
 				s.writeError(w, http.StatusBadRequest, "invalid_body", err.Error())
 				return
+			}
+			if spec.validateCreate != nil {
+				if verr := spec.validateCreate(body); verr != nil {
+					s.writeError(w, http.StatusBadRequest, verr.code, verr.message)
+					return
+				}
 			}
 			created := s.store.create(spec.kind, spec.projectID, spec.create(body))
 			s.writeJSON(w, http.StatusCreated, spec.render(created))
@@ -187,12 +209,13 @@ func (s *Server) routeEntitlements(w http.ResponseWriter, r *http.Request, proje
 
 func (s *Server) routeOfferings(w http.ResponseWriter, r *http.Request, projectID string, segments []string) {
 	spec := collectionSpec{
-		kind:      "offering",
-		projectID: projectID,
-		basePath:  "/v2/projects/" + projectID + "/offerings",
-		render:    renderOffering,
-		create:    offeringFields,
-		update:    offeringFields,
+		kind:           "offering",
+		projectID:      projectID,
+		basePath:       "/v2/projects/" + projectID + "/offerings",
+		render:         renderOffering,
+		create:         offeringFields,
+		update:         offeringFields,
+		validateCreate: validateOfferingCreate,
 	}
 
 	// /offerings/<id>/packages is the packages collection scoped to an offering.

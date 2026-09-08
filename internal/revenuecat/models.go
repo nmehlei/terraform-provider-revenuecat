@@ -12,7 +12,7 @@ const (
 	AppTypePaddle      = "paddle"
 )
 
-// AppTypes lists every accepted value of an app's type attribute.
+// AppTypes lists every value RevenueCat itself accepts for an app's type.
 var AppTypes = []string{
 	AppTypeAppStore,
 	AppTypeMacAppStore,
@@ -22,6 +22,16 @@ var AppTypes = []string{
 	AppTypeRCBilling,
 	AppTypeRoku,
 	AppTypePaddle,
+}
+
+// ImplementedAppTypes lists the subset of AppTypes this provider can actually
+// create — the ones whose nested type-specific config object it knows how to
+// send. Narrower than AppTypes on purpose: sending "type" alone without that
+// object is a guaranteed 400 (see CreateAppRequest), so allowing a value here
+// before its config struct exists would just move the failure from plan time
+// to apply time.
+var ImplementedAppTypes = []string{
+	AppTypePlayStore,
 }
 
 // Product type values RevenueCat recognizes.
@@ -43,19 +53,33 @@ type Project struct {
 	CreatedAt int64  `json:"created_at"`
 }
 
-// App is a store app belonging to a project.
-type App struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	ProjectID string `json:"project_id"`
-	CreatedAt int64  `json:"created_at"`
+// PlayStoreConfig is the Play Store-specific configuration nested under an
+// app's "play_store" key, both on create and in the API's own response.
+type PlayStoreConfig struct {
+	PackageName string `json:"package_name"`
 }
 
-// CreateAppRequest is the payload for creating an app.
+// App is a store app belonging to a project. The API nests store-specific
+// configuration under a key named after the store type (e.g. "play_store");
+// this provider currently only implements that nesting for Play Store apps
+// (see AppTypes vs. ImplementedAppTypes) — every other type's config object
+// (app_store, amazon, stripe, rc_billing, roku, paddle) still needs adding.
+type App struct {
+	ID        string           `json:"id"`
+	Name      string           `json:"name"`
+	Type      string           `json:"type"`
+	ProjectID string           `json:"project_id"`
+	CreatedAt int64            `json:"created_at"`
+	PlayStore *PlayStoreConfig `json:"play_store,omitempty"`
+}
+
+// CreateAppRequest is the payload for creating an app. The API rejects the
+// request with "'play_store' is a required property" unless the type-specific
+// object is present alongside "type" — a discriminated union, not a flat enum.
 type CreateAppRequest struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
+	Name      string           `json:"name"`
+	Type      string           `json:"type"`
+	PlayStore *PlayStoreConfig `json:"play_store,omitempty"`
 }
 
 // UpdateAppRequest is the payload for updating an app. Only a name change is
@@ -114,11 +138,13 @@ type Offering struct {
 	CreatedAt   int64             `json:"created_at"`
 }
 
-// CreateOfferingRequest is the payload for creating an offering.
+// CreateOfferingRequest is the payload for creating an offering. The API
+// rejects "is_current" here ("Additional properties are not allowed") — a
+// freshly created offering always starts non-current; making it current is
+// only accepted on update (UpdateOfferingRequest), never on create.
 type CreateOfferingRequest struct {
 	LookupKey   string            `json:"lookup_key"`
 	DisplayName *string           `json:"display_name,omitempty"`
-	IsCurrent   *bool             `json:"is_current,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 

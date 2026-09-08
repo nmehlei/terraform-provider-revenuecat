@@ -13,9 +13,10 @@ import (
 func catalogFixture(projectID string) string {
 	return fmt.Sprintf(`
 resource "revenuecat_app" "ios" {
-  project_id = %[1]q
-  name       = "Acme iOS"
-  type       = "app_store"
+  project_id   = %[1]q
+  name         = "Acme Android"
+  type         = "play_store"
+  package_name = "com.acme.app"
 }
 
 resource "revenuecat_product" "a" {
