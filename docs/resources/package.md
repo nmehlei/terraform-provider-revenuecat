@@ -32,12 +32,11 @@ resource "revenuecat_package" "monthly" {
 
 - `project_id` (String) Identifier of the project the package belongs to. Changing this forces a new package.
 - `offering_id` (String) Identifier of the offering the package belongs to. Changing this forces a new package.
-- `lookup_key` (String) Key used to reference the package from the RevenueCat SDKs, for example `$rc_monthly`.
-
-### Optional
-
-- `display_name` (String) Human-readable name of the package, shown in the RevenueCat dashboard.
-- `position` (Number) Position of the package within its offering, used to order packages on a paywall.
+- `lookup_key` (String) Key used to reference the package from the RevenueCat SDKs, for example
+  `$rc_monthly`. The API has no way to change this after creation, so changing it here forces a new package.
+- `display_name` (String) Human-readable name of the package, shown in the RevenueCat dashboard. Required by the API.
+- `position` (Number) Position of the package within its offering, used to order packages on a
+  paywall. Optional on create, but the API requires it on every later update, so it is required here too.
 
 ### Read-Only
 

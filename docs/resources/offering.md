@@ -10,6 +10,10 @@ description: |-
 Manages an offering within a RevenueCat project. An offering groups the packages presented to
 customers on a paywall.
 
+RevenueCat's API only accepts `is_current` on an update, not on create — creating an offering with
+`is_current = true` transparently issues the create followed by an update; there is nothing to
+configure differently on your end for that.
+
 ## Example Usage
 
 ```terraform

@@ -117,7 +117,8 @@ func TestIdentifiersAreUnique(t *testing.T) {
 	seen := map[string]bool{}
 	for i := 0; i < 5; i++ {
 		_, created := h.do("POST", "/v2/projects/"+project+"/entitlements", map[string]any{
-			"lookup_key": fmt.Sprintf("key%d", i),
+			"lookup_key":   fmt.Sprintf("key%d", i),
+			"display_name": fmt.Sprintf("Key %d", i),
 		})
 		id, _ := created["id"].(string)
 		if seen[id] {
@@ -190,7 +191,7 @@ func TestWrongProjectIsNotFound(t *testing.T) {
 	projectA := h.seedProject()
 	projectB := h.server.CreateProject("Other")
 
-	_, created := h.do("POST", "/v2/projects/"+projectA+"/entitlements", map[string]any{"lookup_key": "pro"})
+	_, created := h.do("POST", "/v2/projects/"+projectA+"/entitlements", map[string]any{"lookup_key": "pro", "display_name": "Pro"})
 	id := created["id"].(string)
 
 	// Addressing the object through the wrong project must not succeed: without
@@ -219,8 +220,8 @@ func TestPackagesAreScopedToTheirOffering(t *testing.T) {
 	idA := offeringA["id"].(string)
 	idB := offeringB["id"].(string)
 
-	h.do("POST", "/v2/projects/"+project+"/offerings/"+idA+"/packages", map[string]any{"lookup_key": "in-a"})
-	h.do("POST", "/v2/projects/"+project+"/offerings/"+idB+"/packages", map[string]any{"lookup_key": "in-b"})
+	h.do("POST", "/v2/projects/"+project+"/offerings/"+idA+"/packages", map[string]any{"lookup_key": "in-a", "display_name": "In A"})
+	h.do("POST", "/v2/projects/"+project+"/offerings/"+idB+"/packages", map[string]any{"lookup_key": "in-b", "display_name": "In B"})
 
 	_, listed := h.do("GET", "/v2/projects/"+project+"/offerings/"+idA+"/packages", nil)
 	items, _ := listed["items"].([]any)
@@ -278,7 +279,7 @@ func TestPaginationSinglePage(t *testing.T) {
 	project := h.seedProject()
 
 	for i := 0; i < 3; i++ {
-		h.do("POST", "/v2/projects/"+project+"/entitlements", map[string]any{"lookup_key": fmt.Sprintf("k%d", i)})
+		h.do("POST", "/v2/projects/"+project+"/entitlements", map[string]any{"lookup_key": fmt.Sprintf("k%d", i), "display_name": fmt.Sprintf("K%d", i)})
 	}
 
 	_, listed := h.do("GET", "/v2/projects/"+project+"/entitlements", nil)
@@ -297,7 +298,7 @@ func TestPaginationWalksEveryItemOnce(t *testing.T) {
 
 	const total = 5
 	for i := 0; i < total; i++ {
-		h.do("POST", "/v2/projects/"+project+"/entitlements", map[string]any{"lookup_key": fmt.Sprintf("k%d", i)})
+		h.do("POST", "/v2/projects/"+project+"/entitlements", map[string]any{"lookup_key": fmt.Sprintf("k%d", i), "display_name": fmt.Sprintf("K%d", i)})
 	}
 
 	seen := map[string]int{}
@@ -338,7 +339,7 @@ func TestAttachAndListProducts(t *testing.T) {
 	h := newHarness(t, Options{PageSize: 50})
 	project := h.seedProject()
 
-	_, entitlement := h.do("POST", "/v2/projects/"+project+"/entitlements", map[string]any{"lookup_key": "pro"})
+	_, entitlement := h.do("POST", "/v2/projects/"+project+"/entitlements", map[string]any{"lookup_key": "pro", "display_name": "Pro"})
 	entitlementID := entitlement["id"].(string)
 
 	_, app := h.do("POST", "/v2/projects/"+project+"/apps", map[string]any{"name": "iOS", "type": "app_store"})
@@ -386,7 +387,7 @@ func TestReattachingUpdatesEligibilityCriteria(t *testing.T) {
 
 	_, offering := h.do("POST", "/v2/projects/"+project+"/offerings", map[string]any{"lookup_key": "default"})
 	_, pkg := h.do("POST", "/v2/projects/"+project+"/offerings/"+offering["id"].(string)+"/packages",
-		map[string]any{"lookup_key": "$rc_monthly"})
+		map[string]any{"lookup_key": "$rc_monthly", "display_name": "Monthly"})
 	packageID := pkg["id"].(string)
 
 	_, app := h.do("POST", "/v2/projects/"+project+"/apps", map[string]any{"name": "iOS", "type": "app_store"})

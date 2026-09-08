@@ -35,9 +35,9 @@ func TestE2ECompleteExampleApplies(t *testing.T) {
 			Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestCheckResourceAttrSet("revenuecat_entitlement.pro", "id"),
 				resource.TestCheckResourceAttr("revenuecat_offering.default", "is_current", "true"),
-				resource.TestCheckResourceAttr("revenuecat_entitlement_product_attachment.pro", "product_ids.#", "3"),
-				checkMockCount(t, env, "app", 2),
-				checkMockCount(t, env, "product", 3),
+				resource.TestCheckResourceAttr("revenuecat_entitlement_product_attachment.pro", "product_ids.#", "2"),
+				checkMockCount(t, env, "app", 1),
+				checkMockCount(t, env, "product", 2),
 				checkMockCount(t, env, "package", 2),
 			),
 		},

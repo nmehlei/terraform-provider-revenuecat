@@ -32,11 +32,12 @@ type appResource struct {
 }
 
 type appModel struct {
-	ID        types.String `tfsdk:"id"`
-	ProjectID types.String `tfsdk:"project_id"`
-	Name      types.String `tfsdk:"name"`
-	Type      types.String `tfsdk:"type"`
-	CreatedAt types.Int64  `tfsdk:"created_at"`
+	ID          types.String `tfsdk:"id"`
+	ProjectID   types.String `tfsdk:"project_id"`
+	Name        types.String `tfsdk:"name"`
+	Type        types.String `tfsdk:"type"`
+	PackageName types.String `tfsdk:"package_name"`
+	CreatedAt   types.Int64  `tfsdk:"created_at"`
 }
 
 func (r *appResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -67,13 +68,23 @@ func (r *appResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"type": schema.StringAttribute{
 				MarkdownDescription: fmt.Sprintf(
-					"Store the app belongs to. One of `%s`. Changing this forces a new app.",
-					joinBackticked(revenuecat.AppTypes),
+					"Store the app belongs to. One of `%s` — RevenueCat's API nests type-specific "+
+						"configuration under a key named after the type, and this provider only "+
+						"implements that nesting for `play_store` so far. Changing this forces a new app.",
+					joinBackticked(revenuecat.ImplementedAppTypes),
 				),
 				Required: true,
 				Validators: []validator.String{
-					stringvalidator.OneOf(revenuecat.AppTypes...),
+					stringvalidator.OneOf(revenuecat.ImplementedAppTypes...),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"package_name": schema.StringAttribute{
+				MarkdownDescription: "Play Store package identifier (e.g. `com.example.app`). Required " +
+					"because `type` currently only accepts `play_store`. Changing this forces a new app.",
+				Required: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -103,6 +114,9 @@ func (r *appResource) Create(ctx context.Context, req resource.CreateRequest, re
 	app, err := r.client.CreateApp(ctx, plan.ProjectID.ValueString(), revenuecat.CreateAppRequest{
 		Name: plan.Name.ValueString(),
 		Type: plan.Type.ValueString(),
+		PlayStore: &revenuecat.PlayStoreConfig{
+			PackageName: plan.PackageName.ValueString(),
+		},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create the RevenueCat app", err.Error())
@@ -182,11 +196,16 @@ func appToModel(projectID string, app *revenuecat.App) appModel {
 	if app.ProjectID != "" {
 		projectID = app.ProjectID
 	}
+	packageName := types.StringNull()
+	if app.PlayStore != nil {
+		packageName = types.StringValue(app.PlayStore.PackageName)
+	}
 	return appModel{
-		ID:        types.StringValue(app.ID),
-		ProjectID: types.StringValue(projectID),
-		Name:      types.StringValue(app.Name),
-		Type:      types.StringValue(app.Type),
-		CreatedAt: types.Int64Value(app.CreatedAt),
+		ID:          types.StringValue(app.ID),
+		ProjectID:   types.StringValue(projectID),
+		Name:        types.StringValue(app.Name),
+		Type:        types.StringValue(app.Type),
+		PackageName: packageName,
+		CreatedAt:   types.Int64Value(app.CreatedAt),
 	}
 }

@@ -49,8 +49,9 @@ resource "revenuecat_package_product_attachment" "monthly" {
 
 - `product` (Block Set, Min: 1) A product attached to the package.
   - `product_id` (String, Required) Identifier of the product to attach.
-  - `eligibility_criteria` (String, Optional) Eligibility criteria the product is attached under,
-    for example `all`.
+  - `eligibility_criteria` (String, Optional) Eligibility criteria the product is attached under.
+    One of `all`, `google_sdk_lt_6`, `google_sdk_ge_6`. The API requires this on every attachment
+    despite it looking optional here; defaults to `all` — eligible for every customer — when not set.
 
 ### Read-Only
 

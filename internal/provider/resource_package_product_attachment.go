@@ -2,14 +2,17 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -91,8 +94,18 @@ func (r *packageProductAttachmentResource) Schema(_ context.Context, _ resource.
 							Required:            true,
 						},
 						"eligibility_criteria": schema.StringAttribute{
-							MarkdownDescription: "Eligibility criteria the product is attached under, for example `all`.",
-							Optional:            true,
+							MarkdownDescription: fmt.Sprintf(
+								"Eligibility criteria the product is attached under. One of `%s`. The API "+
+									"requires this on every attachment despite it looking optional; defaults "+
+									"to `all` — eligible for every customer — when not set.",
+								joinBackticked(revenuecat.EligibilityCriteriaValues),
+							),
+							Optional: true,
+							Computed: true,
+							Default:  stringdefault.StaticString(revenuecat.EligibilityCriteriaAll),
+							Validators: []validator.String{
+								stringvalidator.OneOf(revenuecat.EligibilityCriteriaValues...),
+							},
 						},
 					},
 				},

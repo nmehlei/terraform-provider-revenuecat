@@ -52,8 +52,9 @@ func TestClientConformance(t *testing.T) {
 	var appID string
 	t.Run("app", func(t *testing.T) {
 		app, err := client.CreateApp(ctx, projectID, revenuecat.CreateAppRequest{
-			Name: "Acme iOS",
-			Type: revenuecat.AppTypeAppStore,
+			Name:      "Acme Android",
+			Type:      revenuecat.AppTypePlayStore,
+			PlayStore: &revenuecat.PlayStoreConfig{PackageName: "com.acme.app"},
 		})
 		if err != nil {
 			t.Fatalf("CreateApp: %v", err)
@@ -67,11 +68,11 @@ func TestClientConformance(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetApp: %v", err)
 		}
-		if read.Name != "Acme iOS" || read.Type != revenuecat.AppTypeAppStore {
+		if read.Name != "Acme Android" || read.Type != revenuecat.AppTypePlayStore {
 			t.Errorf("read back %+v, want the values that were created", read)
 		}
 
-		name := "Acme iOS Renamed"
+		name := "Acme Android Renamed"
 		updated, err := client.UpdateApp(ctx, projectID, appID, revenuecat.UpdateAppRequest{Name: &name})
 		if err != nil {
 			t.Fatalf("UpdateApp: %v", err)
@@ -79,7 +80,7 @@ func TestClientConformance(t *testing.T) {
 		if updated.Name != name {
 			t.Errorf("update returned name %q, want %q", updated.Name, name)
 		}
-		if updated.Type != revenuecat.AppTypeAppStore {
+		if updated.Type != revenuecat.AppTypePlayStore {
 			t.Errorf("update changed the type to %q; it should be untouched", updated.Type)
 		}
 	})
@@ -123,10 +124,9 @@ func TestClientConformance(t *testing.T) {
 
 	var entitlementID string
 	t.Run("entitlement", func(t *testing.T) {
-		displayName := "Pro"
 		entitlement, err := client.CreateEntitlement(ctx, projectID, revenuecat.CreateEntitlementRequest{
 			LookupKey:   "pro",
-			DisplayName: &displayName,
+			DisplayName: "Pro",
 		})
 		if err != nil {
 			t.Fatalf("CreateEntitlement: %v", err)
@@ -135,7 +135,7 @@ func TestClientConformance(t *testing.T) {
 
 		newName := "Pro Plus"
 		updated, err := client.UpdateEntitlement(ctx, projectID, entitlementID, revenuecat.UpdateEntitlementRequest{
-			DisplayName: &newName,
+			DisplayName: newName,
 		})
 		if err != nil {
 			t.Fatalf("UpdateEntitlement: %v", err)
@@ -176,16 +176,23 @@ func TestClientConformance(t *testing.T) {
 
 	var offeringID, packageID string
 	t.Run("offering and package", func(t *testing.T) {
-		isCurrent := true
+		// is_current is a create-time 400 against the real API ("Additional
+		// properties are not allowed") — it only takes effect on a follow-up
+		// update, which is what actually exercises the round-trip here.
 		offering, err := client.CreateOffering(ctx, projectID, revenuecat.CreateOfferingRequest{
 			LookupKey: "default",
-			IsCurrent: &isCurrent,
 			Metadata:  map[string]string{"variant": "a"},
 		})
 		if err != nil {
 			t.Fatalf("CreateOffering: %v", err)
 		}
 		offeringID = offering.ID
+
+		isCurrent := true
+		offering, err = client.UpdateOffering(ctx, projectID, offeringID, revenuecat.UpdateOfferingRequest{IsCurrent: &isCurrent})
+		if err != nil {
+			t.Fatalf("UpdateOffering (is_current): %v", err)
+		}
 
 		if !offering.IsCurrent {
 			t.Error("is_current did not round-trip as true")
@@ -196,8 +203,9 @@ func TestClientConformance(t *testing.T) {
 
 		position := int64(1)
 		pkg, err := client.CreatePackage(ctx, projectID, offeringID, revenuecat.CreatePackageRequest{
-			LookupKey: "$rc_monthly",
-			Position:  &position,
+			LookupKey:   "$rc_monthly",
+			DisplayName: "Monthly",
+			Position:    &position,
 		})
 		if err != nil {
 			t.Fatalf("CreatePackage: %v", err)
@@ -206,6 +214,23 @@ func TestClientConformance(t *testing.T) {
 
 		if pkg.Position == nil || *pkg.Position != 1 {
 			t.Errorf("position = %v, want 1", pkg.Position)
+		}
+
+		renamed, err := client.UpdatePackage(ctx, projectID, packageID, revenuecat.UpdatePackageRequest{
+			DisplayName: "Monthly Plan",
+			Position:    2,
+		})
+		if err != nil {
+			t.Fatalf("UpdatePackage: %v", err)
+		}
+		if renamed.DisplayName != "Monthly Plan" {
+			t.Errorf("display_name = %q, want %q", renamed.DisplayName, "Monthly Plan")
+		}
+		if renamed.Position == nil || *renamed.Position != 2 {
+			t.Errorf("position = %v, want 2", renamed.Position)
+		}
+		if renamed.LookupKey != "$rc_monthly" {
+			t.Errorf("lookup_key = %q, want it unchanged", renamed.LookupKey)
 		}
 
 		read, err := client.GetPackage(ctx, projectID, packageID)

@@ -48,15 +48,28 @@ func TestCatalogOperationWireContract(t *testing.T) {
 		wantBody   map[string]any
 	}{
 		{
+			// The API is a discriminated union: "type" alone 400s without the
+			// matching nested object (play_store here — the only type this
+			// provider implements, see ImplementedAppTypes).
 			name:     "create app",
 			response: App{ID: "app1"},
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.CreateApp(ctx, "proj1", CreateAppRequest{Name: "iOS", Type: AppTypeAppStore})
+				_, err := c.CreateApp(ctx, "proj1", CreateAppRequest{
+					Name:      "Android",
+					Type:      AppTypePlayStore,
+					PlayStore: &PlayStoreConfig{PackageName: "com.example.app"},
+				})
 				return err
 			},
 			wantMethod: "POST",
 			wantPath:   "/v2/projects/proj1/apps",
-			wantBody:   map[string]any{"name": "iOS", "type": "app_store"},
+			wantBody: map[string]any{
+				"name": "Android",
+				"type": "play_store",
+				"play_store": map[string]any{
+					"package_name": "com.example.app",
+				},
+			},
 		},
 		{
 			name:     "get app",
@@ -120,7 +133,7 @@ func TestCatalogOperationWireContract(t *testing.T) {
 			name:     "create entitlement",
 			response: Entitlement{ID: "entl1"},
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.CreateEntitlement(ctx, "proj1", CreateEntitlementRequest{LookupKey: "pro", DisplayName: ptr("Pro")})
+				_, err := c.CreateEntitlement(ctx, "proj1", CreateEntitlementRequest{LookupKey: "pro", DisplayName: "Pro"})
 				return err
 			},
 			wantMethod: "POST",
@@ -131,7 +144,7 @@ func TestCatalogOperationWireContract(t *testing.T) {
 			name:     "update entitlement",
 			response: Entitlement{ID: "entl1"},
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.UpdateEntitlement(ctx, "proj1", "entl1", UpdateEntitlementRequest{DisplayName: ptr("Pro Plus")})
+				_, err := c.UpdateEntitlement(ctx, "proj1", "entl1", UpdateEntitlementRequest{DisplayName: "Pro Plus"})
 				return err
 			},
 			wantMethod: "POST",
@@ -139,12 +152,14 @@ func TestCatalogOperationWireContract(t *testing.T) {
 			wantBody:   map[string]any{"display_name": "Pro Plus"},
 		},
 		{
+			// is_current is deliberately absent: the API rejects it on create
+			// ("Additional properties are not allowed") — see UpdateOfferingRequest
+			// for how a resource actually marks an offering current.
 			name:     "create offering",
 			response: Offering{ID: "ofrng1"},
 			call: func(ctx context.Context, c *Client) error {
 				_, err := c.CreateOffering(ctx, "proj1", CreateOfferingRequest{
 					LookupKey: "default",
-					IsCurrent: boolPtr(true),
 					Metadata:  map[string]string{"tier": "a"},
 				})
 				return err
@@ -153,20 +168,47 @@ func TestCatalogOperationWireContract(t *testing.T) {
 			wantPath:   "/v2/projects/proj1/offerings",
 			wantBody: map[string]any{
 				"lookup_key": "default",
-				"is_current": true,
 				"metadata":   map[string]any{"tier": "a"},
 			},
+		},
+		{
+			name:     "mark offering current",
+			response: Offering{ID: "ofrng1", IsCurrent: true},
+			call: func(ctx context.Context, c *Client) error {
+				_, err := c.UpdateOffering(ctx, "proj1", "ofrng1", UpdateOfferingRequest{IsCurrent: boolPtr(true)})
+				return err
+			},
+			wantMethod: "POST",
+			wantPath:   "/v2/projects/proj1/offerings/ofrng1",
+			wantBody:   map[string]any{"is_current": true},
 		},
 		{
 			name:     "create package under offering",
 			response: Package{ID: "pkg1"},
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.CreatePackage(ctx, "proj1", "ofrng1", CreatePackageRequest{LookupKey: "monthly", Position: i64(1)})
+				_, err := c.CreatePackage(ctx, "proj1", "ofrng1", CreatePackageRequest{
+					LookupKey:   "monthly",
+					DisplayName: "Monthly",
+					Position:    i64(1),
+				})
 				return err
 			},
 			wantMethod: "POST",
 			wantPath:   "/v2/projects/proj1/offerings/ofrng1/packages",
-			wantBody:   map[string]any{"lookup_key": "monthly", "position": float64(1)},
+			wantBody:   map[string]any{"lookup_key": "monthly", "display_name": "Monthly", "position": float64(1)},
+		},
+		{
+			// Unlike create, the API requires both display_name and position
+			// on update, and rejects lookup_key entirely — see UpdatePackageRequest.
+			name:     "update package",
+			response: Package{ID: "pkg1"},
+			call: func(ctx context.Context, c *Client) error {
+				_, err := c.UpdatePackage(ctx, "proj1", "pkg1", UpdatePackageRequest{DisplayName: "Monthly Plan", Position: 2})
+				return err
+			},
+			wantMethod: "POST",
+			wantPath:   "/v2/projects/proj1/packages/pkg1",
+			wantBody:   map[string]any{"display_name": "Monthly Plan", "position": float64(2)},
 		},
 		{
 			name:     "get package",

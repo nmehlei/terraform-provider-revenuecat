@@ -13,9 +13,10 @@ import (
 func catalogFixture(projectID string) string {
 	return fmt.Sprintf(`
 resource "revenuecat_app" "ios" {
-  project_id = %[1]q
-  name       = "Acme iOS"
-  type       = "app_store"
+  project_id   = %[1]q
+  name         = "Acme Android"
+  type         = "play_store"
+  package_name = "com.acme.app"
 }
 
 resource "revenuecat_product" "a" {
@@ -40,8 +41,9 @@ resource "revenuecat_product" "c" {
 }
 
 resource "revenuecat_entitlement" "pro" {
-  project_id = %[1]q
-  lookup_key = "pro"
+  project_id   = %[1]q
+  lookup_key   = "pro"
+  display_name = "Pro"
 }
 `, projectID)
 }
@@ -116,9 +118,11 @@ resource "revenuecat_offering" "default" {
 }
 
 resource "revenuecat_package" "monthly" {
-  project_id  = %[1]q
-  offering_id = revenuecat_offering.default.id
-  lookup_key  = "$rc_monthly"
+  project_id   = %[1]q
+  offering_id  = revenuecat_offering.default.id
+  lookup_key   = "$rc_monthly"
+  display_name = "Monthly"
+  position     = 1
 }
 `, env.projectID)
 

@@ -1,6 +1,10 @@
-# An end-to-end RevenueCat catalog: two store apps, their products, an
-# entitlement granted by those products, and an offering whose packages present
-# them on a paywall.
+# An end-to-end RevenueCat catalog: a store app, its products, an entitlement
+# granted by those products, and an offering whose packages present them on a
+# paywall.
+#
+# Only Play Store apps today: the API nests type-specific configuration under
+# a key named after the store type, and this provider only implements that
+# nesting for "play_store" so far (see revenuecat_app's docs).
 
 terraform {
   required_providers {
@@ -27,40 +31,27 @@ data "revenuecat_project" "main" {
   name = var.project_name
 }
 
-resource "revenuecat_app" "ios" {
-  project_id = data.revenuecat_project.main.id
-  name       = "Acme iOS"
-  type       = "app_store"
-}
-
 resource "revenuecat_app" "android" {
-  project_id = data.revenuecat_project.main.id
-  name       = "Acme Android"
-  type       = "play_store"
+  project_id   = data.revenuecat_project.main.id
+  name         = "Acme Android"
+  type         = "play_store"
+  package_name = "com.acme.app"
 }
 
-resource "revenuecat_product" "monthly_ios" {
-  project_id       = data.revenuecat_project.main.id
-  app_id           = revenuecat_app.ios.id
-  store_identifier = "com.acme.pro.monthly"
-  type             = "subscription"
-  display_name     = "Pro Monthly (iOS)"
-}
-
-resource "revenuecat_product" "monthly_android" {
+resource "revenuecat_product" "monthly" {
   project_id       = data.revenuecat_project.main.id
   app_id           = revenuecat_app.android.id
   store_identifier = "com.acme.pro.monthly"
   type             = "subscription"
-  display_name     = "Pro Monthly (Android)"
+  display_name     = "Pro Monthly"
 }
 
-resource "revenuecat_product" "annual_ios" {
+resource "revenuecat_product" "annual" {
   project_id       = data.revenuecat_project.main.id
-  app_id           = revenuecat_app.ios.id
+  app_id           = revenuecat_app.android.id
   store_identifier = "com.acme.pro.annual"
   type             = "subscription"
-  display_name     = "Pro Annual (iOS)"
+  display_name     = "Pro Annual"
 }
 
 resource "revenuecat_entitlement" "pro" {
@@ -76,9 +67,8 @@ resource "revenuecat_entitlement_product_attachment" "pro" {
   entitlement_id = revenuecat_entitlement.pro.id
 
   product_ids = [
-    revenuecat_product.monthly_ios.id,
-    revenuecat_product.monthly_android.id,
-    revenuecat_product.annual_ios.id,
+    revenuecat_product.monthly.id,
+    revenuecat_product.annual.id,
   ]
 }
 
@@ -109,20 +99,12 @@ resource "revenuecat_package" "annual" {
   position     = 2
 }
 
-# A package groups the equivalent product on each store, so the paywall offers
-# one "Monthly" choice regardless of platform.
 resource "revenuecat_package_product_attachment" "monthly" {
   project_id = data.revenuecat_project.main.id
   package_id = revenuecat_package.monthly.id
 
   product {
-    product_id           = revenuecat_product.monthly_ios.id
-    eligibility_criteria = "all"
-  }
-
-  product {
-    product_id           = revenuecat_product.monthly_android.id
-    eligibility_criteria = "all"
+    product_id = revenuecat_product.monthly.id
   }
 }
 
@@ -131,8 +113,7 @@ resource "revenuecat_package_product_attachment" "annual" {
   package_id = revenuecat_package.annual.id
 
   product {
-    product_id           = revenuecat_product.annual_ios.id
-    eligibility_criteria = "all"
+    product_id = revenuecat_product.annual.id
   }
 }
 

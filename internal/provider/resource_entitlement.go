@@ -60,12 +60,17 @@ func (r *entitlementResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"lookup_key": schema.StringAttribute{
-				MarkdownDescription: "Key used to reference the entitlement from the RevenueCat SDKs, for example `pro`.",
-				Required:            true,
+				MarkdownDescription: "Key used to reference the entitlement from the RevenueCat SDKs, for " +
+					"example `pro`. The API has no way to change this after creation, so changing it " +
+					"here forces a new entitlement.",
+				Required: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"display_name": schema.StringAttribute{
-				MarkdownDescription: "Human-readable name of the entitlement, shown in the RevenueCat dashboard.",
-				Optional:            true,
+				MarkdownDescription: "Human-readable name of the entitlement, shown in the RevenueCat dashboard. Required by the API.",
+				Required:            true,
 			},
 			"created_at": schema.Int64Attribute{
 				MarkdownDescription: "Creation time of the entitlement, in milliseconds since the Unix epoch.",
@@ -91,7 +96,7 @@ func (r *entitlementResource) Create(ctx context.Context, req resource.CreateReq
 
 	entitlement, err := r.client.CreateEntitlement(ctx, plan.ProjectID.ValueString(), revenuecat.CreateEntitlementRequest{
 		LookupKey:   plan.LookupKey.ValueString(),
-		DisplayName: optionalString(plan.DisplayName),
+		DisplayName: plan.DisplayName.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create the RevenueCat entitlement", err.Error())
@@ -129,10 +134,11 @@ func (r *entitlementResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	lookupKey := plan.LookupKey.ValueString()
+	// lookup_key has RequiresReplace on it, so plan.LookupKey is always
+	// unchanged here — and the API rejects it as an unexpected property on
+	// update regardless, so it is deliberately not sent.
 	entitlement, err := r.client.UpdateEntitlement(ctx, state.ProjectID.ValueString(), state.ID.ValueString(), revenuecat.UpdateEntitlementRequest{
-		LookupKey:   &lookupKey,
-		DisplayName: optionalString(plan.DisplayName),
+		DisplayName: plan.DisplayName.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to update the RevenueCat entitlement", err.Error())
@@ -174,7 +180,7 @@ func entitlementToModel(projectID string, entitlement *revenuecat.Entitlement) e
 		ID:          types.StringValue(entitlement.ID),
 		ProjectID:   types.StringValue(projectID),
 		LookupKey:   types.StringValue(entitlement.LookupKey),
-		DisplayName: stringOrNull(entitlement.DisplayName),
+		DisplayName: types.StringValue(entitlement.DisplayName),
 		CreatedAt:   types.Int64Value(entitlement.CreatedAt),
 	}
 }

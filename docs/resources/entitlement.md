@@ -29,11 +29,9 @@ resource "revenuecat_entitlement" "pro" {
 ### Required
 
 - `project_id` (String) Identifier of the project the entitlement belongs to. Changing this forces a new entitlement.
-- `lookup_key` (String) Key used to reference the entitlement from the RevenueCat SDKs, for example `pro`.
-
-### Optional
-
-- `display_name` (String) Human-readable name of the entitlement, shown in the RevenueCat dashboard.
+- `lookup_key` (String) Key used to reference the entitlement from the RevenueCat SDKs, for example
+  `pro`. The API has no way to change this after creation, so changing it here forces a new entitlement.
+- `display_name` (String) Human-readable name of the entitlement, shown in the RevenueCat dashboard. Required by the API.
 
 ### Read-Only
 

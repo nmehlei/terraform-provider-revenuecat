@@ -12,7 +12,7 @@ const (
 	AppTypePaddle      = "paddle"
 )
 
-// AppTypes lists every accepted value of an app's type attribute.
+// AppTypes lists every value RevenueCat itself accepts for an app's type.
 var AppTypes = []string{
 	AppTypeAppStore,
 	AppTypeMacAppStore,
@@ -22,6 +22,16 @@ var AppTypes = []string{
 	AppTypeRCBilling,
 	AppTypeRoku,
 	AppTypePaddle,
+}
+
+// ImplementedAppTypes lists the subset of AppTypes this provider can actually
+// create — the ones whose nested type-specific config object it knows how to
+// send. Narrower than AppTypes on purpose: sending "type" alone without that
+// object is a guaranteed 400 (see CreateAppRequest), so allowing a value here
+// before its config struct exists would just move the failure from plan time
+// to apply time.
+var ImplementedAppTypes = []string{
+	AppTypePlayStore,
 }
 
 // Product type values RevenueCat recognizes.
@@ -43,19 +53,33 @@ type Project struct {
 	CreatedAt int64  `json:"created_at"`
 }
 
-// App is a store app belonging to a project.
-type App struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	ProjectID string `json:"project_id"`
-	CreatedAt int64  `json:"created_at"`
+// PlayStoreConfig is the Play Store-specific configuration nested under an
+// app's "play_store" key, both on create and in the API's own response.
+type PlayStoreConfig struct {
+	PackageName string `json:"package_name"`
 }
 
-// CreateAppRequest is the payload for creating an app.
+// App is a store app belonging to a project. The API nests store-specific
+// configuration under a key named after the store type (e.g. "play_store");
+// this provider currently only implements that nesting for Play Store apps
+// (see AppTypes vs. ImplementedAppTypes) — every other type's config object
+// (app_store, amazon, stripe, rc_billing, roku, paddle) still needs adding.
+type App struct {
+	ID        string           `json:"id"`
+	Name      string           `json:"name"`
+	Type      string           `json:"type"`
+	ProjectID string           `json:"project_id"`
+	CreatedAt int64            `json:"created_at"`
+	PlayStore *PlayStoreConfig `json:"play_store,omitempty"`
+}
+
+// CreateAppRequest is the payload for creating an app. The API rejects the
+// request with "'play_store' is a required property" unless the type-specific
+// object is present alongside "type" — a discriminated union, not a flat enum.
 type CreateAppRequest struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
+	Name      string           `json:"name"`
+	Type      string           `json:"type"`
+	PlayStore *PlayStoreConfig `json:"play_store,omitempty"`
 }
 
 // UpdateAppRequest is the payload for updating an app. Only a name change is
@@ -92,15 +116,19 @@ type Entitlement struct {
 }
 
 // CreateEntitlementRequest is the payload for creating an entitlement.
+// display_name is required by the API here (unlike most other resources'
+// display_name, which is optional) — omitting it is a 400.
 type CreateEntitlementRequest struct {
-	LookupKey   string  `json:"lookup_key"`
-	DisplayName *string `json:"display_name,omitempty"`
+	LookupKey   string `json:"lookup_key"`
+	DisplayName string `json:"display_name"`
 }
 
-// UpdateEntitlementRequest is the payload for updating an entitlement.
+// UpdateEntitlementRequest is the payload for updating an entitlement. The
+// API accepts only display_name here — lookup_key is part of the
+// entitlement's identity and cannot be changed after creation; sending it
+// 400s as an unexpected property, so it has no field here at all.
 type UpdateEntitlementRequest struct {
-	LookupKey   *string `json:"lookup_key,omitempty"`
-	DisplayName *string `json:"display_name,omitempty"`
+	DisplayName string `json:"display_name"`
 }
 
 // Offering is an offering belonging to a project.
@@ -114,11 +142,13 @@ type Offering struct {
 	CreatedAt   int64             `json:"created_at"`
 }
 
-// CreateOfferingRequest is the payload for creating an offering.
+// CreateOfferingRequest is the payload for creating an offering. The API
+// rejects "is_current" here ("Additional properties are not allowed") — a
+// freshly created offering always starts non-current; making it current is
+// only accepted on update (UpdateOfferingRequest), never on create.
 type CreateOfferingRequest struct {
 	LookupKey   string            `json:"lookup_key"`
 	DisplayName *string           `json:"display_name,omitempty"`
-	IsCurrent   *bool             `json:"is_current,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
@@ -140,22 +170,46 @@ type Package struct {
 	CreatedAt   int64  `json:"created_at"`
 }
 
-// CreatePackageRequest is the payload for creating a package.
+// CreatePackageRequest is the payload for creating a package. display_name
+// is required by the API here; position stays optional on create (unlike on
+// update, see UpdatePackageRequest).
 type CreatePackageRequest struct {
-	LookupKey   string  `json:"lookup_key"`
-	DisplayName *string `json:"display_name,omitempty"`
-	Position    *int64  `json:"position,omitempty"`
+	LookupKey   string `json:"lookup_key"`
+	DisplayName string `json:"display_name"`
+	Position    *int64 `json:"position,omitempty"`
 }
 
-// UpdatePackageRequest is the payload for updating a package.
+// UpdatePackageRequest is the payload for updating a package. Unlike create,
+// the API requires both display_name and position here, and rejects
+// lookup_key entirely — part of the package's identity, not updatable — so
+// it has no field here at all.
 type UpdatePackageRequest struct {
-	LookupKey   *string `json:"lookup_key,omitempty"`
-	DisplayName *string `json:"display_name,omitempty"`
-	Position    *int64  `json:"position,omitempty"`
+	DisplayName string `json:"display_name"`
+	Position    int64  `json:"position"`
+}
+
+// Eligibility criteria values RevenueCat recognizes for a package product
+// attachment. Unlike EligibilityCriteria's json tag suggests, the API
+// requires this field on every attach_products entry — it is never actually
+// optional.
+const (
+	EligibilityCriteriaAll           = "all"
+	EligibilityCriteriaGoogleSDKLt6  = "google_sdk_lt_6"
+	EligibilityCriteriaGoogleSDKGte6 = "google_sdk_ge_6"
+)
+
+// EligibilityCriteriaValues lists every accepted eligibility_criteria value.
+var EligibilityCriteriaValues = []string{
+	EligibilityCriteriaAll,
+	EligibilityCriteriaGoogleSDKLt6,
+	EligibilityCriteriaGoogleSDKGte6,
 }
 
 // PackageProduct associates a product with a package under an eligibility
-// criteria.
+// criteria. EligibilityCriteria is required by the API on every attach —
+// omitting it is a 400, despite the json tag below looking optional; the
+// omitempty exists only so a zero-value PackageProduct doesn't marshal an
+// empty string when a caller has a real bug, not to make the field elidable.
 type PackageProduct struct {
 	ProductID           string `json:"product_id"`
 	EligibilityCriteria string `json:"eligibility_criteria,omitempty"`
