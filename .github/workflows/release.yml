@@ -7,6 +7,8 @@ name: Release
 on:
   push:
     branches: [main]
+  # For re-cutting a release without an unrelated commit — e.g. after rotating the signing key.
+  workflow_dispatch:
 
 permissions:
   contents: write
