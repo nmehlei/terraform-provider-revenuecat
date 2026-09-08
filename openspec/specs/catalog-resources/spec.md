@@ -72,9 +72,11 @@ The `revenuecat_product` resource SHALL manage a product within a project. It SH
 
 ### Requirement: Entitlement resource manages an entitlement
 The `revenuecat_entitlement` resource SHALL manage an entitlement within a project. It SHALL
-require `project_id` and `lookup_key`, accept an optional `display_name`, and expose computed `id`
-and `created_at`. Changing `project_id` SHALL force replacement; changing `lookup_key` or
-`display_name` SHALL update in place.
+require `project_id`, `lookup_key` and `display_name` (the API requires the latter on create,
+unlike most other resources' `display_name`), and expose computed `id` and `created_at`. Changing
+`project_id` or `lookup_key` SHALL force replacement — the API has no update endpoint field for
+`lookup_key`, so it is part of the entitlement's identity, not an in-place-updatable attribute;
+changing `display_name` SHALL update in place.
 
 #### Scenario: Entitlement created
 - **WHEN** an entitlement is created with a lookup key and display name
@@ -82,7 +84,7 @@ and `created_at`. Changing `project_id` SHALL force replacement; changing `looku
 
 #### Scenario: Lookup key changed
 - **WHEN** `lookup_key` changes
-- **THEN** the provider issues an update call and does not replace the entitlement
+- **THEN** the plan replaces the entitlement rather than attempting an update the API does not support
 
 ### Requirement: Offering resource manages an offering
 The `revenuecat_offering` resource SHALL manage an offering within a project. It SHALL require
@@ -101,17 +103,23 @@ Changing `project_id` SHALL force replacement; other attribute changes SHALL upd
 
 ### Requirement: Package resource manages a package within an offering
 The `revenuecat_package` resource SHALL manage a package belonging to an offering. It SHALL require
-`project_id`, `offering_id` and `lookup_key`, accept an optional `display_name` and an optional
-`position`, and expose computed `id` and `created_at`. Changing `project_id` or `offering_id` SHALL
-force replacement; changing `lookup_key`, `display_name` or `position` SHALL update in place.
+`project_id`, `offering_id`, `lookup_key`, `display_name` and `position` — the API requires
+`display_name` and `position` on every update even though `position` is optional on create, so
+both are required here to avoid a package that can be created but never renamed. Changing
+`project_id`, `offering_id` or `lookup_key` SHALL force replacement — the API has no update
+endpoint field for `lookup_key`; changing `display_name` or `position` SHALL update in place.
 
 #### Scenario: Package created under an offering
-- **WHEN** a package is created with a project ID, offering ID and lookup key
+- **WHEN** a package is created with a project ID, offering ID, lookup key, display name and position
 - **THEN** the provider issues a create call to that offering's packages endpoint
 
 #### Scenario: Package moved to a different offering
 - **WHEN** `offering_id` changes
 - **THEN** the plan replaces the package
+
+#### Scenario: Lookup key changed
+- **WHEN** `lookup_key` changes
+- **THEN** the plan replaces the package rather than attempting an update the API does not support
 
 ### Requirement: Resources support import
 Every managed resource SHALL support `terraform import` using a colon-delimited identifier that

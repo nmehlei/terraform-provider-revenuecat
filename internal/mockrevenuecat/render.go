@@ -114,6 +114,26 @@ func renderEntitlement(obj *object) map[string]any {
 	})
 }
 
+// validateEntitlementCreate mirrors the real API requiring display_name on
+// create (unlike most other resources' display_name, which is optional).
+func validateEntitlementCreate(body map[string]any) *validationError {
+	if _, ok := body["display_name"]; !ok {
+		return &validationError{code: "parameter_error", message: "'display_name' is a required property"}
+	}
+	return nil
+}
+
+// validateEntitlementUpdate mirrors the real API's update endpoint accepting
+// only display_name — lookup_key is part of an entitlement's identity and
+// cannot be changed after creation, so sending it 400s as an unexpected
+// property.
+func validateEntitlementUpdate(body map[string]any) *validationError {
+	if _, ok := body["lookup_key"]; ok {
+		return &validationError{code: "parameter_error", message: "Additional properties are not allowed ('lookup_key' was unexpected)"}
+	}
+	return nil
+}
+
 // validateOfferingCreate mirrors the real API rejecting "is_current" on
 // create ("Additional properties are not allowed") — an offering can only be
 // marked current through a later update, never at creation.
@@ -158,6 +178,64 @@ func renderOffering(obj *object) map[string]any {
 
 func packageFields(body map[string]any) map[string]any {
 	return copyFields(body, "lookup_key", "display_name", "position")
+}
+
+// validatePackageCreate mirrors the real API requiring display_name on
+// create (position stays optional there — only update requires it).
+func validatePackageCreate(body map[string]any) *validationError {
+	if _, ok := body["display_name"]; !ok {
+		return &validationError{code: "parameter_error", message: "'display_name' is a required property"}
+	}
+	return nil
+}
+
+// validatePackageUpdate mirrors the real API's update endpoint: display_name
+// and position are both required there (unlike on create), and lookup_key —
+// part of a package's identity — is rejected as an unexpected property.
+func validatePackageUpdate(body map[string]any) *validationError {
+	if _, ok := body["lookup_key"]; ok {
+		return &validationError{code: "parameter_error", message: "Additional properties are not allowed ('lookup_key' was unexpected)"}
+	}
+	if _, ok := body["display_name"]; !ok {
+		return &validationError{code: "parameter_error", message: "'display_name' is a required property"}
+	}
+	if _, ok := body["position"]; !ok {
+		return &validationError{code: "parameter_error", message: "'position' is a required property"}
+	}
+	return nil
+}
+
+// packageEligibilityCriteria lists the values the real API accepts for a
+// package product attachment's eligibility_criteria.
+var packageEligibilityCriteria = map[string]bool{
+	"all":             true,
+	"google_sdk_lt_6": true,
+	"google_sdk_ge_6": true,
+}
+
+// validatePackageAttachProducts mirrors the real API requiring
+// eligibility_criteria (one of a fixed enum) on every attached product —
+// unlike an entitlement's plain product_ids, a package's attach_products body
+// is a "products" array of {product_id, eligibility_criteria} objects.
+func validatePackageAttachProducts(body map[string]any) *validationError {
+	products, ok := body["products"].([]any)
+	if !ok {
+		return &validationError{code: "parameter_error", message: "'products' is a required property"}
+	}
+	for _, raw := range products {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		criteria, _ := entry["eligibility_criteria"].(string)
+		if criteria == "" {
+			return &validationError{code: "parameter_error", message: "'eligibility_criteria' is a required property"}
+		}
+		if !packageEligibilityCriteria[criteria] {
+			return &validationError{code: "parameter_error", message: "eligibility_criteria must be one of 'all', 'google_sdk_lt_6', 'google_sdk_ge_6'"}
+		}
+	}
+	return nil
 }
 
 func renderPackage(obj *object) map[string]any {

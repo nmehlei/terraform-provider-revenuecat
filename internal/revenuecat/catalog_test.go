@@ -133,7 +133,7 @@ func TestCatalogOperationWireContract(t *testing.T) {
 			name:     "create entitlement",
 			response: Entitlement{ID: "entl1"},
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.CreateEntitlement(ctx, "proj1", CreateEntitlementRequest{LookupKey: "pro", DisplayName: ptr("Pro")})
+				_, err := c.CreateEntitlement(ctx, "proj1", CreateEntitlementRequest{LookupKey: "pro", DisplayName: "Pro"})
 				return err
 			},
 			wantMethod: "POST",
@@ -144,7 +144,7 @@ func TestCatalogOperationWireContract(t *testing.T) {
 			name:     "update entitlement",
 			response: Entitlement{ID: "entl1"},
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.UpdateEntitlement(ctx, "proj1", "entl1", UpdateEntitlementRequest{DisplayName: ptr("Pro Plus")})
+				_, err := c.UpdateEntitlement(ctx, "proj1", "entl1", UpdateEntitlementRequest{DisplayName: "Pro Plus"})
 				return err
 			},
 			wantMethod: "POST",
@@ -186,12 +186,29 @@ func TestCatalogOperationWireContract(t *testing.T) {
 			name:     "create package under offering",
 			response: Package{ID: "pkg1"},
 			call: func(ctx context.Context, c *Client) error {
-				_, err := c.CreatePackage(ctx, "proj1", "ofrng1", CreatePackageRequest{LookupKey: "monthly", Position: i64(1)})
+				_, err := c.CreatePackage(ctx, "proj1", "ofrng1", CreatePackageRequest{
+					LookupKey:   "monthly",
+					DisplayName: "Monthly",
+					Position:    i64(1),
+				})
 				return err
 			},
 			wantMethod: "POST",
 			wantPath:   "/v2/projects/proj1/offerings/ofrng1/packages",
-			wantBody:   map[string]any{"lookup_key": "monthly", "position": float64(1)},
+			wantBody:   map[string]any{"lookup_key": "monthly", "display_name": "Monthly", "position": float64(1)},
+		},
+		{
+			// Unlike create, the API requires both display_name and position
+			// on update, and rejects lookup_key entirely — see UpdatePackageRequest.
+			name:     "update package",
+			response: Package{ID: "pkg1"},
+			call: func(ctx context.Context, c *Client) error {
+				_, err := c.UpdatePackage(ctx, "proj1", "pkg1", UpdatePackageRequest{DisplayName: "Monthly Plan", Position: 2})
+				return err
+			},
+			wantMethod: "POST",
+			wantPath:   "/v2/projects/proj1/packages/pkg1",
+			wantBody:   map[string]any{"display_name": "Monthly Plan", "position": float64(2)},
 		},
 		{
 			name:     "get package",

@@ -109,6 +109,11 @@ type collectionSpec struct {
 	// which is exactly how both of those bugs shipped once already.
 	validateCreate func(body map[string]any) *validationError
 
+	// validateUpdate is validateCreate's counterpart for the update body —
+	// several resources accept a different, narrower field set on update than
+	// on create (an entitlement's or package's lookup_key, for instance).
+	validateUpdate func(body map[string]any) *validationError
+
 	// match optionally narrows which stored objects belong to this collection.
 	match func(*object) bool
 }
@@ -165,6 +170,12 @@ func (s *Server) routeCollection(w http.ResponseWriter, r *http.Request, spec co
 				s.writeError(w, http.StatusBadRequest, "invalid_body", err.Error())
 				return
 			}
+			if spec.validateUpdate != nil {
+				if verr := spec.validateUpdate(body); verr != nil {
+					s.writeError(w, http.StatusBadRequest, verr.code, verr.message)
+					return
+				}
+			}
 			updated, ok := s.store.update(spec.kind, spec.projectID, id, spec.update(body))
 			if !ok {
 				s.notFound(w, spec.kind)
@@ -190,12 +201,14 @@ func (s *Server) routeCollection(w http.ResponseWriter, r *http.Request, spec co
 
 func (s *Server) routeEntitlements(w http.ResponseWriter, r *http.Request, projectID string, segments []string) {
 	spec := collectionSpec{
-		kind:      "entitlement",
-		projectID: projectID,
-		basePath:  "/v2/projects/" + projectID + "/entitlements",
-		render:    renderEntitlement,
-		create:    entitlementFields,
-		update:    entitlementFields,
+		kind:           "entitlement",
+		projectID:      projectID,
+		basePath:       "/v2/projects/" + projectID + "/entitlements",
+		render:         renderEntitlement,
+		create:         entitlementFields,
+		update:         entitlementFields,
+		validateCreate: validateEntitlementCreate,
+		validateUpdate: validateEntitlementUpdate,
 	}
 
 	// /entitlements/<id>/products and /entitlements/<id>/actions/<action>
@@ -236,7 +249,9 @@ func (s *Server) routeOfferings(w http.ResponseWriter, r *http.Request, projectI
 				fields["offering_id"] = offeringID
 				return fields
 			},
-			update: packageFields,
+			update:         packageFields,
+			validateCreate: validatePackageCreate,
+			validateUpdate: validatePackageUpdate,
 			match: func(obj *object) bool {
 				return obj.Fields["offering_id"] == offeringID
 			},
@@ -256,12 +271,14 @@ func (s *Server) routePackages(w http.ResponseWriter, r *http.Request, projectID
 	}
 
 	s.routeCollection(w, r, collectionSpec{
-		kind:      "package",
-		projectID: projectID,
-		basePath:  "/v2/projects/" + projectID + "/packages",
-		render:    renderPackage,
-		create:    packageFields,
-		update:    packageFields,
+		kind:           "package",
+		projectID:      projectID,
+		basePath:       "/v2/projects/" + projectID + "/packages",
+		render:         renderPackage,
+		create:         packageFields,
+		update:         packageFields,
+		validateCreate: validatePackageCreate,
+		validateUpdate: validatePackageUpdate,
 	}, segments)
 }
 
@@ -328,6 +345,12 @@ func (s *Server) routeAttachments(
 
 		switch segments[2] {
 		case "attach_products":
+			if kind == "package" {
+				if verr := validatePackageAttachProducts(body); verr != nil {
+					s.writeError(w, http.StatusBadRequest, verr.code, verr.message)
+					return
+				}
+			}
 			s.store.attach(kind, parentID, attachmentsFromBody(body))
 		case "detach_products":
 			s.store.detach(kind, parentID, productIDsFromBody(body))

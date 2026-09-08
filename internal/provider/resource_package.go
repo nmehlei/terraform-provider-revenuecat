@@ -70,16 +70,24 @@ func (r *packageResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"lookup_key": schema.StringAttribute{
-				MarkdownDescription: "Key used to reference the package from the RevenueCat SDKs, for example `$rc_monthly`.",
-				Required:            true,
+				MarkdownDescription: "Key used to reference the package from the RevenueCat SDKs, for " +
+					"example `$rc_monthly`. The API has no way to change this after creation, so " +
+					"changing it here forces a new package.",
+				Required: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"display_name": schema.StringAttribute{
-				MarkdownDescription: "Human-readable name of the package, shown in the RevenueCat dashboard.",
-				Optional:            true,
+				MarkdownDescription: "Human-readable name of the package, shown in the RevenueCat dashboard. Required by the API.",
+				Required:            true,
 			},
 			"position": schema.Int64Attribute{
-				MarkdownDescription: "Position of the package within its offering, used to order packages on a paywall.",
-				Optional:            true,
+				MarkdownDescription: "Position of the package within its offering, used to order packages " +
+					"on a paywall. Optional on create, but the API requires it on every later update, so " +
+					"it is required here too rather than leaving a package that can be created but never " +
+					"renamed without also supplying this.",
+				Required: true,
 			},
 			"created_at": schema.Int64Attribute{
 				MarkdownDescription: "Creation time of the package, in milliseconds since the Unix epoch.",
@@ -103,10 +111,11 @@ func (r *packageResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	position := plan.Position.ValueInt64()
 	pkg, err := r.client.CreatePackage(ctx, plan.ProjectID.ValueString(), plan.OfferingID.ValueString(), revenuecat.CreatePackageRequest{
 		LookupKey:   plan.LookupKey.ValueString(),
-		DisplayName: optionalString(plan.DisplayName),
-		Position:    optionalInt64(plan.Position),
+		DisplayName: plan.DisplayName.ValueString(),
+		Position:    &position,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create the RevenueCat package", err.Error())
@@ -144,11 +153,13 @@ func (r *packageResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	lookupKey := plan.LookupKey.ValueString()
+	// lookup_key has RequiresReplace on it, so plan.LookupKey is always
+	// unchanged here — and the API rejects it as an unexpected property on
+	// update regardless, so it is deliberately not sent. display_name and
+	// position are both required on update (unlike on create).
 	pkg, err := r.client.UpdatePackage(ctx, state.ProjectID.ValueString(), state.ID.ValueString(), revenuecat.UpdatePackageRequest{
-		LookupKey:   &lookupKey,
-		DisplayName: optionalString(plan.DisplayName),
-		Position:    optionalInt64(plan.Position),
+		DisplayName: plan.DisplayName.ValueString(),
+		Position:    plan.Position.ValueInt64(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to update the RevenueCat package", err.Error())
@@ -192,7 +203,7 @@ func packageToModel(projectID, offeringID string, pkg *revenuecat.Package) packa
 		ProjectID:   types.StringValue(projectID),
 		OfferingID:  types.StringValue(offeringID),
 		LookupKey:   types.StringValue(pkg.LookupKey),
-		DisplayName: stringOrNull(pkg.DisplayName),
+		DisplayName: types.StringValue(pkg.DisplayName),
 		Position:    int64OrNull(pkg.Position),
 		CreatedAt:   types.Int64Value(pkg.CreatedAt),
 	}

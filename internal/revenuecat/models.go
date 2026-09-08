@@ -116,15 +116,19 @@ type Entitlement struct {
 }
 
 // CreateEntitlementRequest is the payload for creating an entitlement.
+// display_name is required by the API here (unlike most other resources'
+// display_name, which is optional) — omitting it is a 400.
 type CreateEntitlementRequest struct {
-	LookupKey   string  `json:"lookup_key"`
-	DisplayName *string `json:"display_name,omitempty"`
+	LookupKey   string `json:"lookup_key"`
+	DisplayName string `json:"display_name"`
 }
 
-// UpdateEntitlementRequest is the payload for updating an entitlement.
+// UpdateEntitlementRequest is the payload for updating an entitlement. The
+// API accepts only display_name here — lookup_key is part of the
+// entitlement's identity and cannot be changed after creation; sending it
+// 400s as an unexpected property, so it has no field here at all.
 type UpdateEntitlementRequest struct {
-	LookupKey   *string `json:"lookup_key,omitempty"`
-	DisplayName *string `json:"display_name,omitempty"`
+	DisplayName string `json:"display_name"`
 }
 
 // Offering is an offering belonging to a project.
@@ -166,22 +170,46 @@ type Package struct {
 	CreatedAt   int64  `json:"created_at"`
 }
 
-// CreatePackageRequest is the payload for creating a package.
+// CreatePackageRequest is the payload for creating a package. display_name
+// is required by the API here; position stays optional on create (unlike on
+// update, see UpdatePackageRequest).
 type CreatePackageRequest struct {
-	LookupKey   string  `json:"lookup_key"`
-	DisplayName *string `json:"display_name,omitempty"`
-	Position    *int64  `json:"position,omitempty"`
+	LookupKey   string `json:"lookup_key"`
+	DisplayName string `json:"display_name"`
+	Position    *int64 `json:"position,omitempty"`
 }
 
-// UpdatePackageRequest is the payload for updating a package.
+// UpdatePackageRequest is the payload for updating a package. Unlike create,
+// the API requires both display_name and position here, and rejects
+// lookup_key entirely — part of the package's identity, not updatable — so
+// it has no field here at all.
 type UpdatePackageRequest struct {
-	LookupKey   *string `json:"lookup_key,omitempty"`
-	DisplayName *string `json:"display_name,omitempty"`
-	Position    *int64  `json:"position,omitempty"`
+	DisplayName string `json:"display_name"`
+	Position    int64  `json:"position"`
+}
+
+// Eligibility criteria values RevenueCat recognizes for a package product
+// attachment. Unlike EligibilityCriteria's json tag suggests, the API
+// requires this field on every attach_products entry — it is never actually
+// optional.
+const (
+	EligibilityCriteriaAll           = "all"
+	EligibilityCriteriaGoogleSDKLt6  = "google_sdk_lt_6"
+	EligibilityCriteriaGoogleSDKGte6 = "google_sdk_ge_6"
+)
+
+// EligibilityCriteriaValues lists every accepted eligibility_criteria value.
+var EligibilityCriteriaValues = []string{
+	EligibilityCriteriaAll,
+	EligibilityCriteriaGoogleSDKLt6,
+	EligibilityCriteriaGoogleSDKGte6,
 }
 
 // PackageProduct associates a product with a package under an eligibility
-// criteria.
+// criteria. EligibilityCriteria is required by the API on every attach —
+// omitting it is a 400, despite the json tag below looking optional; the
+// omitempty exists only so a zero-value PackageProduct doesn't marshal an
+// empty string when a caller has a real bug, not to make the field elidable.
 type PackageProduct struct {
 	ProductID           string `json:"product_id"`
 	EligibilityCriteria string `json:"eligibility_criteria,omitempty"`

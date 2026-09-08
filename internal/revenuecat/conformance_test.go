@@ -124,10 +124,9 @@ func TestClientConformance(t *testing.T) {
 
 	var entitlementID string
 	t.Run("entitlement", func(t *testing.T) {
-		displayName := "Pro"
 		entitlement, err := client.CreateEntitlement(ctx, projectID, revenuecat.CreateEntitlementRequest{
 			LookupKey:   "pro",
-			DisplayName: &displayName,
+			DisplayName: "Pro",
 		})
 		if err != nil {
 			t.Fatalf("CreateEntitlement: %v", err)
@@ -136,7 +135,7 @@ func TestClientConformance(t *testing.T) {
 
 		newName := "Pro Plus"
 		updated, err := client.UpdateEntitlement(ctx, projectID, entitlementID, revenuecat.UpdateEntitlementRequest{
-			DisplayName: &newName,
+			DisplayName: newName,
 		})
 		if err != nil {
 			t.Fatalf("UpdateEntitlement: %v", err)
@@ -204,8 +203,9 @@ func TestClientConformance(t *testing.T) {
 
 		position := int64(1)
 		pkg, err := client.CreatePackage(ctx, projectID, offeringID, revenuecat.CreatePackageRequest{
-			LookupKey: "$rc_monthly",
-			Position:  &position,
+			LookupKey:   "$rc_monthly",
+			DisplayName: "Monthly",
+			Position:    &position,
 		})
 		if err != nil {
 			t.Fatalf("CreatePackage: %v", err)
@@ -214,6 +214,23 @@ func TestClientConformance(t *testing.T) {
 
 		if pkg.Position == nil || *pkg.Position != 1 {
 			t.Errorf("position = %v, want 1", pkg.Position)
+		}
+
+		renamed, err := client.UpdatePackage(ctx, projectID, packageID, revenuecat.UpdatePackageRequest{
+			DisplayName: "Monthly Plan",
+			Position:    2,
+		})
+		if err != nil {
+			t.Fatalf("UpdatePackage: %v", err)
+		}
+		if renamed.DisplayName != "Monthly Plan" {
+			t.Errorf("display_name = %q, want %q", renamed.DisplayName, "Monthly Plan")
+		}
+		if renamed.Position == nil || *renamed.Position != 2 {
+			t.Errorf("position = %v, want 2", renamed.Position)
+		}
+		if renamed.LookupKey != "$rc_monthly" {
+			t.Errorf("lookup_key = %q, want it unchanged", renamed.LookupKey)
 		}
 
 		read, err := client.GetPackage(ctx, projectID, packageID)

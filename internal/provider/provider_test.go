@@ -181,11 +181,11 @@ func TestIdentityAttributesRequireReplace(t *testing.T) {
 	ctx := context.Background()
 
 	wantRequiresReplace := map[string][]string{
-		"revenuecat_app":                            {"project_id", "type"},
+		"revenuecat_app":                            {"project_id", "type", "package_name"},
 		"revenuecat_product":                        {"project_id", "app_id", "store_identifier", "type"},
-		"revenuecat_entitlement":                    {"project_id"},
+		"revenuecat_entitlement":                    {"project_id", "lookup_key"},
 		"revenuecat_offering":                       {"project_id"},
-		"revenuecat_package":                        {"project_id", "offering_id"},
+		"revenuecat_package":                        {"project_id", "offering_id", "lookup_key"},
 		"revenuecat_entitlement_product_attachment": {"project_id", "entitlement_id"},
 		"revenuecat_package_product_attachment":     {"project_id", "package_id"},
 	}
@@ -230,9 +230,9 @@ func TestUpdatableAttributesDoNotRequireReplace(t *testing.T) {
 
 	inPlace := map[string][]string{
 		"revenuecat_app":         {"name"},
-		"revenuecat_entitlement": {"lookup_key", "display_name"},
+		"revenuecat_entitlement": {"display_name"},
 		"revenuecat_offering":    {"lookup_key", "display_name"},
-		"revenuecat_package":     {"lookup_key", "display_name"},
+		"revenuecat_package":     {"display_name"},
 	}
 
 	for _, newResource := range New("test")().Resources(ctx) {
