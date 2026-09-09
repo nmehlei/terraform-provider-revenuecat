@@ -74,7 +74,11 @@ func (r *productResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"store_identifier": schema.StringAttribute{
 				MarkdownDescription: "Product identifier in the underlying store, for example the App Store " +
-					"product ID. Changing this forces a new product.",
+					"product ID. For a Play Store subscription this is not the bare subscription ID — " +
+					"the API 400s with \"must follow the format 'subscriptionId:basePlanId'\" unless it's " +
+					"`<subscription ID>:<base plan ID>`, reflecting that a Play Billing subscription is one " +
+					"subscription with multiple base plans, each a separate RevenueCat product. Changing " +
+					"this forces a new product.",
 				Required: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
