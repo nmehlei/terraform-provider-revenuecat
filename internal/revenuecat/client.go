@@ -302,7 +302,13 @@ func (c *Client) decodeError(resp *http.Response, method, path string) *APIError
 }
 
 func isRetryableStatus(status int) bool {
-	return status == http.StatusTooManyRequests || status >= 500
+	// 423 Locked: the API returns this for a mutation on a package whose
+	// offering has another mutation in flight (its own concurrency control,
+	// not a client error) — observed destroying one package while updating
+	// another in the same offering, which a plain Terraform apply does
+	// concurrently by default since the two are independent in the resource
+	// graph. Retrying is the correct response, the same as 429 and 5xx.
+	return status == http.StatusTooManyRequests || status == http.StatusLocked || status >= 500
 }
 
 // backoffDelay returns the wait before the given attempt (1-based), honoring a

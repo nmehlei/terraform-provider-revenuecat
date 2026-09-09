@@ -68,12 +68,17 @@ The error message SHALL include the request method and path to make the failure 
 - **THEN** the returned error is recognizable as a not-found error by callers without string matching
 
 ### Requirement: Transient failures are retried with backoff
-The client SHALL retry requests that fail with HTTP `429` or any `5xx` status, and requests that
-fail with a transport error, up to the configured retry limit, waiting with exponential backoff
+The client SHALL retry requests that fail with HTTP `429`, `423`, or any `5xx` status, and requests
+that fail with a transport error, up to the configured retry limit, waiting with exponential backoff
 between attempts. It SHALL NOT retry other `4xx` responses.
 
 #### Scenario: Rate limit is retried
 - **WHEN** the API responds `429` once and then `200`
+- **THEN** the client returns the successful result without surfacing an error
+
+#### Scenario: Resource-locked is retried
+- **WHEN** the API responds `423` (the API's own concurrency control, returned when a package
+  mutation races another mutation on a package in the same offering) once and then succeeds
 - **THEN** the client returns the successful result without surfacing an error
 
 #### Scenario: Retry-After is honored
