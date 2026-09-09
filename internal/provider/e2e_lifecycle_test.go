@@ -303,6 +303,50 @@ resource "revenuecat_package" "test" {
 			ImportStateIdFunc: importIDFunc("revenuecat_package.test", "project_id", "offering_id", "id"),
 		},
 	)
+}
+
+// TestE2EPackageCreatedWithNonDefaultPosition guards against the real API's
+// create endpoint silently returning a different position than the one
+// requested (observed in production returning 1 for a create that sent 2).
+// A first step whose position is already non-1 forces the create path,
+// unlike TestE2EPackageLifecycle above, whose second step reaches that
+// position through an update. ConfigPlanChecks: expectEmptyPlan() fails the
+// "provider produced inconsistent result" error the API's own behavior would
+// trigger without resource_package.go's self-heal.
+func TestE2EPackageCreatedWithNonDefaultPosition(t *testing.T) {
+	requireTerraform(t)
+	env := newE2EEnv(t)
+
+	env.steps(t,
+		resource.TestStep{
+			Config: fmt.Sprintf(`
+resource "revenuecat_offering" "default" {
+  project_id = %[1]q
+  lookup_key = "default"
+}
+
+resource "revenuecat_package" "monthly" {
+  project_id   = %[1]q
+  offering_id  = revenuecat_offering.default.id
+  lookup_key   = "$rc_monthly"
+  display_name = "Monthly"
+  position     = 1
+}
+
+resource "revenuecat_package" "annual" {
+  project_id   = %[1]q
+  offering_id  = revenuecat_offering.default.id
+  lookup_key   = "$rc_annual"
+  display_name = "Annual"
+  position     = 2
+}
+`, env.projectID),
+			ConfigPlanChecks: expectEmptyPlan(),
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("revenuecat_package.annual", "position", "2"),
+			),
+		},
+	)
 
 	env.checkNoObjectsRemain(t, "package", "offering")
 }

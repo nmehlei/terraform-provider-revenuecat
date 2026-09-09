@@ -86,7 +86,9 @@ func (r *packageResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "Position of the package within its offering, used to order packages " +
 					"on a paywall. Optional on create, but the API requires it on every later update, so " +
 					"it is required here too rather than leaving a package that can be created but never " +
-					"renamed without also supplying this.",
+					"renamed without also supplying this. The create endpoint does not reliably honor the " +
+					"requested value — this resource detects the mismatch and issues a follow-up update to " +
+					"correct it, so the configured value is always what ends up in state.",
 				Required: true,
 			},
 			"created_at": schema.Int64Attribute{
@@ -120,6 +122,24 @@ func (r *packageResource) Create(ctx context.Context, req resource.CreateRequest
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create the RevenueCat package", err.Error())
 		return
+	}
+
+	// The create endpoint documents position as accepted but does not reliably
+	// honor it — observed in practice returning position 1 for a create request
+	// that asked for 2, which then fails Terraform's post-apply consistency
+	// check ("provider produced inconsistent result"). The update endpoint does
+	// honor it, so self-heal with a follow-up call whenever the API's response
+	// disagrees with what was requested, mirroring how offeringResource.Create
+	// already has to follow up for is_current.
+	if pkg.Position == nil || *pkg.Position != position {
+		pkg, err = r.client.UpdatePackage(ctx, plan.ProjectID.ValueString(), pkg.ID, revenuecat.UpdatePackageRequest{
+			DisplayName: plan.DisplayName.ValueString(),
+			Position:    position,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Unable to correct the RevenueCat package's position after create", err.Error())
+			return
+		}
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, packageToModel(plan.ProjectID.ValueString(), plan.OfferingID.ValueString(), pkg))...)
