@@ -25,6 +25,23 @@ resource "revenuecat_product" "monthly_ios" {
 }
 ```
 
+~> **Play Store subscriptions need `<subscription ID>:<base plan ID>`, not a bare ID.** A Play
+Billing subscription is one subscription with multiple base plans, and RevenueCat represents each
+base plan as its own product. `store_identifier = "com.acme.pro.monthly"` 400s against a Play Store
+app with `Play Store subscription product's 'store_identifier' must follow the format
+'subscriptionId:basePlanId'.` — this only applies to Play Store apps; App Store and the other types
+use a flat identifier as shown above.
+
+```terraform
+resource "revenuecat_product" "monthly_android" {
+  project_id       = data.revenuecat_project.main.id
+  app_id           = revenuecat_app.android.id
+  store_identifier = "acme_pro:monthly"
+  type             = "subscription"
+  display_name     = "Pro Monthly (Android)"
+}
+```
+
 ## Schema
 
 ### Required
@@ -32,7 +49,8 @@ resource "revenuecat_product" "monthly_ios" {
 - `project_id` (String) Identifier of the project the product belongs to. Changing this forces a new product.
 - `app_id` (String) Identifier of the app the product belongs to. Changing this forces a new product.
 - `store_identifier` (String) Product identifier in the underlying store, for example the App Store
-  product ID. Changing this forces a new product.
+  product ID. For a Play Store subscription this is not the bare subscription ID — see the warning
+  above. Changing this forces a new product.
 - `type` (String) Type of the product. One of `subscription`, `one_time`. Changing this forces a new product.
 
 ### Optional
