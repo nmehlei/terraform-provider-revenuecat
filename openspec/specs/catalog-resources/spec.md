@@ -113,6 +113,13 @@ endpoint field for `lookup_key`; changing `display_name` or `position` SHALL upd
 - **WHEN** a package is created with a project ID, offering ID, lookup key, display name and position
 - **THEN** the provider issues a create call to that offering's packages endpoint
 
+#### Scenario: Create endpoint does not honor the requested position
+- **WHEN** a package is created and the create response's position differs from the position
+  requested (the real API does not reliably honor `position` on create, unlike on update)
+- **THEN** the provider issues a follow-up update call carrying the requested position, mirroring
+  how `revenuecat_offering` self-heals `is_current` after create
+- **AND** state reflects the requested position, not the create response's value
+
 #### Scenario: Package moved to a different offering
 - **WHEN** `offering_id` changes
 - **THEN** the plan replaces the package

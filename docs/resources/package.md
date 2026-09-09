@@ -37,6 +37,8 @@ resource "revenuecat_package" "monthly" {
 - `display_name` (String) Human-readable name of the package, shown in the RevenueCat dashboard. Required by the API.
 - `position` (Number) Position of the package within its offering, used to order packages on a
   paywall. Optional on create, but the API requires it on every later update, so it is required here too.
+  The create endpoint does not reliably honor the requested value — this resource detects the mismatch
+  and issues a follow-up update to correct it, so the configured value is always what ends up in state.
 
 ### Read-Only
 

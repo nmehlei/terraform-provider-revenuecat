@@ -247,6 +247,12 @@ func (s *Server) routeOfferings(w http.ResponseWriter, r *http.Request, projectI
 			create: func(body map[string]any) map[string]any {
 				fields := packageFields(body)
 				fields["offering_id"] = offeringID
+				// The real create endpoint does not reliably honor a requested
+				// position — observed returning 1 for a create request that sent
+				// 2. Mirror that here (always 1 on create, regardless of what was
+				// requested) so the provider's Create() is forced through the
+				// same follow-up-update self-heal it needs against the real API.
+				fields["position"] = float64(1)
 				return fields
 			},
 			update:         packageFields,
