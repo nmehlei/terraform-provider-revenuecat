@@ -229,6 +229,36 @@ func TestRateLimitIsRetried(t *testing.T) {
 	}
 }
 
+// TestResourceLockedIsRetried guards against a real API behavior: mutating
+// two packages in the same offering concurrently (as a plain Terraform apply
+// does by default, since they're independent in the resource graph) makes
+// the API 423 one of them with "currently being updated by a different
+// request" — observed in production destroying revenuecat_package.annual
+// while revenuecat_package.monthly was being updated in the same apply. That
+// is exactly the kind of transient, retry-and-it-clears failure the client's
+// retry loop already handles for 429 and 5xx; 423 belongs in the same set.
+func TestResourceLockedIsRetried(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) == 1 {
+			w.WriteHeader(http.StatusLocked)
+			fmt.Fprint(w, `{"code":"resource_locked_error","message":"Packages from offering ofrng1 are currently being updated by a different request"}`)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c, _ := newTestClient(t, srv)
+	err := c.DeletePackage(context.Background(), "proj1", "pkg1")
+	if err != nil {
+		t.Fatalf("DeletePackage: %v", err)
+	}
+	if calls.Load() != 2 {
+		t.Errorf("calls = %d, want 2", calls.Load())
+	}
+}
+
 func TestRetryAfterIsHonored(t *testing.T) {
 	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
