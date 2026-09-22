@@ -148,3 +148,34 @@ func TestExamplesParse(t *testing.T) {
 		})
 	}
 }
+
+// TestAppDocsCoverTheCredentialAttributes keeps the page honest about the one
+// attribute whose misuse is silent. A practitioner who sets the credential
+// without its version, or stores it in a non-ephemeral value, gets no error
+// from Terraform — only refunded purchases days later — so the page has to say
+// so explicitly.
+func TestAppDocsCoverTheCredentialAttributes(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "docs", "resources", "app.md"))
+	if err != nil {
+		t.Fatalf("reading docs/resources/app.md: %v", err)
+	}
+	content := string(raw)
+
+	for _, attribute := range []string{
+		"play_service_account_credentials_json_wo",
+		"play_service_account_credentials_json_wo_version",
+		"play_service_account_credentials_configured",
+	} {
+		if !strings.Contains(content, attribute) {
+			t.Errorf("docs/resources/app.md does not document the %q attribute", attribute)
+		}
+	}
+
+	// The two conditions that make the attribute behave unexpectedly.
+	for _, caveat := range []string{"1.11", "ephemeral"} {
+		if !strings.Contains(content, caveat) {
+			t.Errorf("docs/resources/app.md never mentions %q; the write-only attribute "+
+				"is silently unusable without it", caveat)
+		}
+	}
+}

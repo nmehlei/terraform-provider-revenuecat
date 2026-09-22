@@ -57,14 +57,44 @@ func renderGeneric(obj *object) map[string]any {
 	return rendered
 }
 
+// playCredentialsField is where the mock keeps a Play service account
+// credential. It is stored apart from the play_store object, and never
+// rendered, for two reasons: the real API never returns the credential, and
+// keeping it flat lets an update rotate the key without the store's field-wise
+// merge clobbering package_name alongside it.
+const playCredentialsField = "_play_service_account_credentials"
+
 func appFields(body map[string]any) map[string]any {
-	return copyFields(body, "name", "type", "play_store")
+	fields := copyFields(body, "name", "type")
+	packageName, credentials := splitPlayStore(body)
+	if packageName != nil {
+		fields["play_store"] = map[string]any{"package_name": packageName}
+	}
+	if credentials != nil {
+		fields[playCredentialsField] = credentials
+	}
+	return fields
 }
 
-// appUpdateFields is narrower than appFields: an app's type is part of its
-// identity, so an update must not be able to change it even if one is sent.
+// appUpdateFields is narrower than appFields: an app's type and package name
+// are part of its identity, so an update must not be able to change them even
+// if one is sent. A credential rotation is the one nested change allowed.
 func appUpdateFields(body map[string]any) map[string]any {
-	return copyFields(body, "name")
+	fields := copyFields(body, "name")
+	if _, credentials := splitPlayStore(body); credentials != nil {
+		fields[playCredentialsField] = credentials
+	}
+	return fields
+}
+
+// splitPlayStore separates the two halves of a play_store object: the package
+// name, which the API echoes back, and the credential, which it never does.
+func splitPlayStore(body map[string]any) (packageName, credentials any) {
+	playStore, ok := body["play_store"].(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	return playStore["package_name"], playStore["play_service_account_credentials_json"]
 }
 
 func renderApp(obj *object) map[string]any {
@@ -72,8 +102,18 @@ func renderApp(obj *object) map[string]any {
 		"name": "",
 		"type": "",
 	})
-	if playStore, ok := obj.Fields["play_store"]; ok {
-		rendered["play_store"] = playStore
+
+	playStore, ok := obj.Fields["play_store"].(map[string]any)
+	if !ok {
+		return rendered
+	}
+
+	// Rebuild rather than pass through, so the credential cannot leak into a
+	// response even if a future change starts storing it inside this object.
+	credentials, _ := obj.Fields[playCredentialsField].(string)
+	rendered["play_store"] = map[string]any{
+		"package_name": playStore["package_name"],
+		"play_service_account_credentials_configured": credentials != "",
 	}
 	return rendered
 }

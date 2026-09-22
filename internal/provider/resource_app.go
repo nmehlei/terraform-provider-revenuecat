@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -17,9 +18,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = (*appResource)(nil)
-	_ resource.ResourceWithConfigure   = (*appResource)(nil)
-	_ resource.ResourceWithImportState = (*appResource)(nil)
+	_ resource.Resource                     = (*appResource)(nil)
+	_ resource.ResourceWithConfigure        = (*appResource)(nil)
+	_ resource.ResourceWithImportState      = (*appResource)(nil)
+	_ resource.ResourceWithConfigValidators = (*appResource)(nil)
 )
 
 // NewAppResource returns the revenuecat_app resource.
@@ -38,6 +40,12 @@ type appModel struct {
 	Type        types.String `tfsdk:"type"`
 	PackageName types.String `tfsdk:"package_name"`
 	CreatedAt   types.Int64  `tfsdk:"created_at"`
+
+	// CredentialsJSONWO is write-only: Terraform leaves it null in both plan
+	// and state, so it is only ever readable from the configuration.
+	CredentialsJSONWO        types.String `tfsdk:"play_service_account_credentials_json_wo"`
+	CredentialsJSONWOVersion types.String `tfsdk:"play_service_account_credentials_json_wo_version"`
+	CredentialsConfigured    types.Bool   `tfsdk:"play_service_account_credentials_configured"`
 }
 
 func (r *appResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -96,7 +104,47 @@ func (r *appResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					int64UseStateForUnknown(),
 				},
 			},
+			"play_service_account_credentials_json_wo": schema.StringAttribute{
+				MarkdownDescription: "Contents of the Google Cloud service account key file RevenueCat uses to " +
+					"verify Play purchases server-side. Write-only: Terraform sends it but never writes it to " +
+					"state or to a plan file, so pair it with an `ephemeral` source (for example " +
+					"`ephemeral.azurerm_key_vault_secret`) to keep the key out of every artifact.\n\n" +
+					"Without this credential RevenueCat cannot acknowledge a Play purchase, and Google " +
+					"auto-refunds every unacknowledged purchase — so an app left without it appears to work " +
+					"until purchases start silently reversing.\n\n" +
+					"Requires Terraform 1.11 or later, and requires " +
+					"`play_service_account_credentials_json_wo_version` to be set alongside it.",
+				Optional:  true,
+				WriteOnly: true,
+				Sensitive: true,
+			},
+			"play_service_account_credentials_json_wo_version": schema.StringAttribute{
+				MarkdownDescription: "Arbitrary version marker for the write-only credential. Terraform cannot " +
+					"detect a change to a value it does not store, so changing this is what tells the provider " +
+					"to send the credential again — bump it whenever the key is rotated. Any string works; a " +
+					"date or an incrementing number is conventional.",
+				Optional: true,
+			},
+			"play_service_account_credentials_configured": schema.BoolAttribute{
+				MarkdownDescription: "Whether RevenueCat holds Play service account credentials for this app. " +
+					"Reported by the API, and the only observable signal that the credential is present — a " +
+					"`false` here is the difference between purchases being verified and being refunded.",
+				Computed: true,
+			},
 		},
+	}
+}
+
+// ConfigValidators rejects a credential with no version. Terraform cannot diff
+// a write-only value, so such a configuration would accept a rotated key and
+// silently never send it — the failure would surface as refunded purchases
+// rather than as an error.
+func (r *appResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
+	return []resource.ConfigValidator{
+		resourcevalidator.RequiredTogether(
+			path.MatchRoot("play_service_account_credentials_json_wo"),
+			path.MatchRoot("play_service_account_credentials_json_wo_version"),
+		),
 	}
 }
 
@@ -105,8 +153,11 @@ func (r *appResource) Configure(_ context.Context, req resource.ConfigureRequest
 }
 
 func (r *appResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan appModel
+	var plan, config appModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	// Write-only attributes are null in the plan by design, so the credential
+	// has to be read from the configuration.
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -115,7 +166,8 @@ func (r *appResource) Create(ctx context.Context, req resource.CreateRequest, re
 		Name: plan.Name.ValueString(),
 		Type: plan.Type.ValueString(),
 		PlayStore: &revenuecat.PlayStoreConfig{
-			PackageName: plan.PackageName.ValueString(),
+			PackageName:                   plan.PackageName.ValueString(),
+			ServiceAccountCredentialsJSON: config.CredentialsJSONWO.ValueString(),
 		},
 	})
 	if err != nil {
@@ -123,7 +175,7 @@ func (r *appResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, appToModel(plan.ProjectID.ValueString(), app))...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, appToModel(plan.ProjectID.ValueString(), app, plan.CredentialsJSONWOVersion))...)
 }
 
 func (r *appResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -143,27 +195,38 @@ func (r *appResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, appToModel(state.ProjectID.ValueString(), app))...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, appToModel(state.ProjectID.ValueString(), app, state.CredentialsJSONWOVersion))...)
 }
 
 func (r *appResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan, state appModel
+	var plan, state, config appModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	name := plan.Name.ValueString()
-	app, err := r.client.UpdateApp(ctx, state.ProjectID.ValueString(), state.ID.ValueString(), revenuecat.UpdateAppRequest{
-		Name: &name,
-	})
+	update := revenuecat.UpdateAppRequest{Name: &name}
+
+	// Resend the credential only when its version moved. Sending it on every
+	// update would push the key over the wire on an unrelated rename; never
+	// sending it would make rotation impossible, because Terraform cannot see
+	// that a write-only value changed.
+	if !plan.CredentialsJSONWOVersion.Equal(state.CredentialsJSONWOVersion) && !config.CredentialsJSONWO.IsNull() {
+		update.PlayStore = &revenuecat.PlayStoreConfig{
+			ServiceAccountCredentialsJSON: config.CredentialsJSONWO.ValueString(),
+		}
+	}
+
+	app, err := r.client.UpdateApp(ctx, state.ProjectID.ValueString(), state.ID.ValueString(), update)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to update the RevenueCat app", err.Error())
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, appToModel(state.ProjectID.ValueString(), app))...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, appToModel(state.ProjectID.ValueString(), app, plan.CredentialsJSONWOVersion))...)
 }
 
 func (r *appResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -191,14 +254,21 @@ func (r *appResource) ImportState(ctx context.Context, req resource.ImportStateR
 }
 
 // appToModel maps an API app onto the resource model. The project ID comes from
-// configuration because the API does not always echo it back.
-func appToModel(projectID string, app *revenuecat.App) appModel {
+// configuration because the API does not always echo it back, and so does the
+// credential version: it is a marker the practitioner owns, which RevenueCat
+// neither stores nor returns.
+//
+// The write-only credential itself is always left null. Terraform requires
+// that, and it is the property the whole attribute exists for.
+func appToModel(projectID string, app *revenuecat.App, credentialsVersion types.String) appModel {
 	if app.ProjectID != "" {
 		projectID = app.ProjectID
 	}
 	packageName := types.StringNull()
+	credentialsConfigured := types.BoolValue(false)
 	if app.PlayStore != nil {
 		packageName = types.StringValue(app.PlayStore.PackageName)
+		credentialsConfigured = types.BoolValue(app.PlayStore.ServiceAccountCredentialsConfigured)
 	}
 	return appModel{
 		ID:          types.StringValue(app.ID),
@@ -207,5 +277,9 @@ func appToModel(projectID string, app *revenuecat.App) appModel {
 		Type:        types.StringValue(app.Type),
 		PackageName: packageName,
 		CreatedAt:   types.Int64Value(app.CreatedAt),
+
+		CredentialsJSONWO:        types.StringNull(),
+		CredentialsJSONWOVersion: credentialsVersion,
+		CredentialsConfigured:    credentialsConfigured,
 	}
 }

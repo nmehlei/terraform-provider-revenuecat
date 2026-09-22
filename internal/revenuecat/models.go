@@ -1,5 +1,7 @@
 package revenuecat
 
+import "encoding/json"
+
 // App type values RevenueCat recognizes for a store app.
 const (
 	AppTypeAppStore    = "app_store"
@@ -55,8 +57,45 @@ type Project struct {
 
 // PlayStoreConfig is the Play Store-specific configuration nested under an
 // app's "play_store" key, both on create and in the API's own response.
+//
+// The two credential fields are deliberately asymmetric, mirroring the API:
+// ServiceAccountCredentialsJSON is only ever sent, and
+// ServiceAccountCredentialsConfigured is only ever received. Without the
+// credential RevenueCat cannot verify a Play purchase server-side, so it never
+// acknowledges one and Google auto-refunds it — the configured flag is the only
+// way that state can surface as drift rather than as a lost purchase.
 type PlayStoreConfig struct {
-	PackageName string `json:"package_name"`
+	PackageName string `json:"package_name,omitempty"`
+
+	// ServiceAccountCredentialsJSON is the whole contents of the Google Cloud
+	// service account key file. Write-only: see UnmarshalJSON.
+	ServiceAccountCredentialsJSON string `json:"play_service_account_credentials_json,omitempty"`
+
+	// ServiceAccountCredentialsConfigured reports whether a credential is set.
+	// Read-only: the API computes it, so it is never sent.
+	ServiceAccountCredentialsConfigured bool `json:"-"`
+}
+
+// playStoreConfigWire decodes the fields the API returns. It exists so
+// UnmarshalJSON can decode without recursing into itself.
+type playStoreConfigWire struct {
+	PackageName                         string `json:"package_name"`
+	ServiceAccountCredentialsConfigured bool   `json:"play_service_account_credentials_configured"`
+}
+
+// UnmarshalJSON drops any credential the API might echo back. The write-only
+// design in the provider rests on the credential never entering state; decoding
+// one here would put it there through the ordinary response path, so this
+// refuses it at the boundary rather than trusting the service to stay silent.
+func (c *PlayStoreConfig) UnmarshalJSON(data []byte) error {
+	var wire playStoreConfigWire
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	c.PackageName = wire.PackageName
+	c.ServiceAccountCredentialsConfigured = wire.ServiceAccountCredentialsConfigured
+	c.ServiceAccountCredentialsJSON = ""
+	return nil
 }
 
 // App is a store app belonging to a project. The API nests store-specific
@@ -82,10 +121,16 @@ type CreateAppRequest struct {
 	PlayStore *PlayStoreConfig `json:"play_store,omitempty"`
 }
 
-// UpdateAppRequest is the payload for updating an app. Only a name change is
-// supported; type and project are part of the app's identity.
+// UpdateAppRequest is the payload for updating an app. Type and project are
+// part of the app's identity and cannot change; a name change and a Play
+// service account credential rotation can both happen in place.
+//
+// PlayStore is omitted entirely unless a credential is being rotated: sending
+// an empty object on a plain rename risks the API reading it as "clear the
+// credential", which would break purchase verification silently.
 type UpdateAppRequest struct {
-	Name *string `json:"name,omitempty"`
+	Name      *string          `json:"name,omitempty"`
+	PlayStore *PlayStoreConfig `json:"play_store,omitempty"`
 }
 
 // Product is a store product belonging to an app within a project.
