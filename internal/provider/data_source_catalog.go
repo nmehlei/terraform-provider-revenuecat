@@ -83,7 +83,7 @@ func (d *appDataSource) Configure(_ context.Context, req datasource.ConfigureReq
 }
 
 func (d *appDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config appModel
+	var config appDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -120,7 +120,37 @@ func (d *appDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		app = found
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, appToModel(projectID, app))...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, appToDataSourceModel(projectID, app))...)
+}
+
+// appDataSourceModel is deliberately narrower than appModel. The resource
+// carries the write-only credential and its version, which are inputs a
+// practitioner supplies; a data source has neither to read back.
+type appDataSourceModel struct {
+	ID          types.String `tfsdk:"id"`
+	ProjectID   types.String `tfsdk:"project_id"`
+	Name        types.String `tfsdk:"name"`
+	Type        types.String `tfsdk:"type"`
+	PackageName types.String `tfsdk:"package_name"`
+	CreatedAt   types.Int64  `tfsdk:"created_at"`
+}
+
+func appToDataSourceModel(projectID string, app *revenuecat.App) appDataSourceModel {
+	if app.ProjectID != "" {
+		projectID = app.ProjectID
+	}
+	packageName := types.StringNull()
+	if app.PlayStore != nil {
+		packageName = types.StringValue(app.PlayStore.PackageName)
+	}
+	return appDataSourceModel{
+		ID:          types.StringValue(app.ID),
+		ProjectID:   types.StringValue(projectID),
+		Name:        types.StringValue(app.Name),
+		Type:        types.StringValue(app.Type),
+		PackageName: packageName,
+		CreatedAt:   types.Int64Value(app.CreatedAt),
+	}
 }
 
 // --- Product --------------------------------------------------------------

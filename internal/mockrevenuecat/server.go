@@ -116,6 +116,19 @@ func (s *Server) Count(kind string) int {
 	return len(s.store.list(kind, nil))
 }
 
+// PlayServiceAccountCredentials returns the credential the mock holds for an
+// app, which no HTTP response ever reveals. A test asserting a rotation needs
+// this: the configured flag stays true across a rotation, so it alone cannot
+// tell a key that was replaced from one that silently was not.
+func (s *Server) PlayServiceAccountCredentials(appID string) string {
+	obj, ok := s.store.get("app", "", appID)
+	if !ok {
+		return ""
+	}
+	credentials, _ := obj.Fields[playCredentialsField].(string)
+	return credentials
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// The health endpoint is deliberately outside authentication so a
 	// container orchestrator can probe it without a credential.
