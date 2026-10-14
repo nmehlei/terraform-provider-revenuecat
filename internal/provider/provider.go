@@ -197,6 +197,7 @@ func (p *revenueCatProvider) Resources(_ context.Context) []func() resource.Reso
 		NewPackageResource,
 		NewEntitlementProductAttachmentResource,
 		NewPackageProductAttachmentResource,
+		NewWebhookIntegrationResource,
 	}
 }
 
@@ -209,5 +210,6 @@ func (p *revenueCatProvider) DataSources(_ context.Context) []func() datasource.
 		NewEntitlementDataSource,
 		NewOfferingDataSource,
 		NewPackageDataSource,
+		NewAppPublicAPIKeysDataSource,
 	}
 }

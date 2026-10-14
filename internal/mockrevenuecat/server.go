@@ -129,6 +129,17 @@ func (s *Server) PlayServiceAccountCredentials(appID string) string {
 	return credentials
 }
 
+// WebhookAuthorizationHeader returns the authorization header the mock holds
+// for a webhook integration, which no HTTP response reveals.
+func (s *Server) WebhookAuthorizationHeader(webhookID string) string {
+	obj, ok := s.store.get("webhook_integration", "", webhookID)
+	if !ok {
+		return ""
+	}
+	header, _ := obj.Fields[webhookHeaderField].(string)
+	return header
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// The health endpoint is deliberately outside authentication so a
 	// container orchestrator can probe it without a credential.

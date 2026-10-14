@@ -336,3 +336,50 @@ func productIDsFromBody(body map[string]any) []string {
 	}
 	return out
 }
+
+// webhookHeaderField is where the mock keeps a webhook's authorization header.
+// Like the Play credential, it is never rendered: the real API does not return
+// it, and echoing it would let a provider that stores it in state pass.
+const webhookHeaderField = "_authorization_header"
+
+func webhookFields(body map[string]any) map[string]any {
+	fields := copyFields(body, "name", "url", "environment", "event_types", "app_id")
+	if header, ok := body["authorization_header"]; ok {
+		fields[webhookHeaderField] = header
+	}
+	return fields
+}
+
+// validateWebhookCreate mirrors the real API requiring name and url.
+func validateWebhookCreate(body map[string]any) *validationError {
+	for _, name := range []string{"name", "url"} {
+		if _, ok := body[name]; !ok {
+			return &validationError{code: "parameter_error", message: "'" + name + "' is a required property"}
+		}
+	}
+	return nil
+}
+
+// renderWebhook always renders the nullable fields, as explicit nulls when
+// unset, because the real API marks them required-but-nullable.
+func renderWebhook(obj *object) map[string]any {
+	rendered := withFields(base(obj, "webhook_integration"), obj, map[string]any{"name": "", "url": ""})
+	for _, name := range []string{"environment", "event_types", "app_id"} {
+		rendered[name] = obj.Fields[name]
+	}
+	return rendered
+}
+
+// renderPublicAPIKey derives an app's production SDK key from its identifier.
+// The real service generates one per app on creation; deriving it keeps the
+// mock stateless here while still giving each app its own stable key.
+func renderPublicAPIKey(app *object) map[string]any {
+	return map[string]any{
+		"object":      "public_api_key",
+		"id":          "pk_" + app.ID,
+		"key":         "goog_" + app.ID,
+		"environment": "production",
+		"app_id":      app.ID,
+		"created_at":  app.CreatedAt,
+	}
+}
