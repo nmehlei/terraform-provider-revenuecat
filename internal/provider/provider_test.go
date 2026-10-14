@@ -74,6 +74,7 @@ func TestProviderRegistersEveryType(t *testing.T) {
 		"revenuecat_package",
 		"revenuecat_entitlement_product_attachment",
 		"revenuecat_package_product_attachment",
+		"revenuecat_webhook_integration",
 	}
 	gotResources := map[string]bool{}
 	for _, newResource := range p.Resources(ctx) {
@@ -98,6 +99,7 @@ func TestProviderRegistersEveryType(t *testing.T) {
 		"revenuecat_entitlement",
 		"revenuecat_offering",
 		"revenuecat_package",
+		"revenuecat_app_public_api_keys",
 	}
 	gotDataSources := map[string]bool{}
 	for _, newDataSource := range p.DataSources(ctx) {

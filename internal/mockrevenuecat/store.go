@@ -101,6 +101,8 @@ var idPrefix = map[string]string{
 	"entitlement": "entl",
 	"offering":    "ofrng",
 	"package":     "pkg",
+
+	"webhook_integration": "wh",
 }
 
 // create stores a new object of the given kind and returns a copy of it.

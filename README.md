@@ -118,11 +118,13 @@ marked sensitive, so it is redacted from plan output and logs.
 | `revenuecat_package` | A package within an offering |
 | `revenuecat_entitlement_product_attachment` | Products granting an entitlement |
 | `revenuecat_package_product_attachment` | Products presented by a package |
+| `revenuecat_webhook_integration` | A webhook receiving the project's events |
 
 **Data sources**
 
 `revenuecat_project`, `revenuecat_projects`, `revenuecat_app`, `revenuecat_product`,
-`revenuecat_entitlement`, `revenuecat_offering`, `revenuecat_package`.
+`revenuecat_entitlement`, `revenuecat_offering`, `revenuecat_package`,
+`revenuecat_app_public_api_keys`.
 
 Full reference documentation is under [`docs/`](docs).
 

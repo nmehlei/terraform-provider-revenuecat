@@ -51,6 +51,21 @@ func (s *Server) routeProjects(w http.ResponseWriter, r *http.Request, segments 
 
 	switch collection {
 	case "apps":
+		// /apps/<id>/public_api_keys lists the app's SDK keys.
+		if len(rest) == 2 && rest[1] == "public_api_keys" {
+			if r.Method != http.MethodGet {
+				s.writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "public API keys are read-only")
+				return
+			}
+			app, ok := s.store.get("app", projectID, rest[0])
+			if !ok {
+				s.notFound(w, "app")
+				return
+			}
+			s.listEnvelope(w, r, "/v2/projects/"+projectID+"/apps/"+app.ID+"/public_api_keys",
+				[]map[string]any{renderPublicAPIKey(app)})
+			return
+		}
 		s.routeCollection(w, r, collectionSpec{
 			kind:           "app",
 			projectID:      projectID,
@@ -73,6 +88,21 @@ func (s *Server) routeProjects(w http.ResponseWriter, r *http.Request, segments 
 
 	case "entitlements":
 		s.routeEntitlements(w, r, projectID, rest)
+
+	case "integrations":
+		if len(rest) == 0 || rest[0] != "webhooks" {
+			s.notFound(w, "integration")
+			return
+		}
+		s.routeCollection(w, r, collectionSpec{
+			kind:           "webhook_integration",
+			projectID:      projectID,
+			basePath:       "/v2/projects/" + projectID + "/integrations/webhooks",
+			render:         renderWebhook,
+			create:         webhookFields,
+			update:         webhookFields,
+			validateCreate: validateWebhookCreate,
+		}, rest[1:])
 
 	case "offerings":
 		s.routeOfferings(w, r, projectID, rest)
